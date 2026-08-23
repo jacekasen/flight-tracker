@@ -3,22 +3,23 @@
 **Author:** Jace Kasen  
 **Reviewers:** TBD  
 **Status:** Working design  
-**Last updated:** August 22, 2026  
+**Last updated:** August 23, 2026
 **Related document:** [`PRODUCT_REQUIREMENTS.md`](PRODUCT_REQUIREMENTS.md)
 
 ## 1. Document overview
 
 ### Overview
 
-This document describes the technical design for Flight Tracker, an Expo mobile application that searches external aviation data through a Supabase Edge Function and will persist private user flight history in Supabase Postgres.
+This document describes the technical design for Flight Tracker, an Expo mobile application that searches external aviation data through an authenticated Supabase Edge Function and persists private user flight history in Supabase Postgres.
 
-The current implementation completes the search path:
+The current implementation completes search and authenticated history:
 
 ```text
-Expo app -> Supabase Edge Function -> RapidAPI -> AeroDataBox
+Expo app -> Supabase Auth -> Edge Function -> RapidAPI -> AeroDataBox
+         -> Postgres with RLS -> private flight timeline
 ```
 
-The next implementation phase adds Supabase Auth, search-result confirmation, persistence, manual entry, and a database-backed history timeline.
+The next implementation phase adds airport metadata, route visualization, aggregate statistics, and yearly recaps.
 
 ### Introduction
 
@@ -100,14 +101,22 @@ Responsibilities:
 - Edge Function invocation.
 - Search state and user-facing error handling.
 - Flight result formatting.
-- Future authentication, save, history, details, and insights.
+- Authentication and persisted session state.
+- Search-result confirmation and duplicate-safe saving.
+- Timeline, flight details, editing, deletion, and manual entry.
+- Future route maps and travel insights.
 
 Key locations:
 
 - `src/app/(tabs)/`
+- `src/app/confirm.tsx`
+- `src/app/manual.tsx`
+- `src/app/flight/[id].tsx`
 - `src/components/`
+- `src/lib/flights.ts`
 - `src/lib/flight-search.ts`
 - `src/lib/supabase.ts`
+- `src/providers/auth-provider.tsx`
 - `src/types/`
 
 #### 2. Search Edge Function
@@ -136,7 +145,7 @@ Responsibilities:
 - Supply the user identity used by RLS.
 - Trigger profile creation.
 
-The client already configures persisted sessions, but no authentication UI currently exists.
+The Profile tab provides email/password account creation, sign-in, and sign-out. `AuthProvider` restores and observes the persisted Supabase session for the entire route tree.
 
 #### 4. Supabase Postgres
 
@@ -183,8 +192,6 @@ sequenceDiagram
 
 ### Save flight sequence
 
-This flow is planned:
-
 ```mermaid
 sequenceDiagram
   participant User
@@ -209,7 +216,7 @@ sequenceDiagram
 2. Query `flights` for the authenticated user.
 3. Order by `scheduled_departure`.
 4. Separate upcoming and completed flights in the client or query layer.
-5. Render cached data, then refresh.
+5. Render loading, empty, or error state and support pull-to-refresh.
 
 ## 5. Detailed design
 
@@ -302,7 +309,7 @@ The MVP identity should include:
 - Origin airport
 - Scheduled UTC departure
 
-The current database uniqueness constraint uses user, flight number, and scheduled departure. Origin should be included when the schema is revised.
+The database uniqueness constraint uses user, flight number, origin, and scheduled departure.
 
 Codeshares should preserve:
 
@@ -319,12 +326,15 @@ type SearchState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
-  | { kind: 'results'; flights: FlightPreview[] };
+  | {
+      kind: 'results';
+      flights: Array<{ result: FlightSearchResult; preview: FlightPreview }>;
+    };
 ```
 
 Search step is tracked separately as `flight` or `date`.
 
-This is sufficient for the current isolated screen. If confirmation and save add more transitions, move the flow into a reducer or dedicated hook rather than adding independent booleans.
+Selecting a result serializes the provider-independent result into the confirmation route. Confirmation and persistence maintain their own explicit loading and error states. If this flow grows further, move the route draft into a reducer-backed context instead of adding independent booleans.
 
 ## 6. Data model
 
@@ -348,54 +358,39 @@ create table public.flights (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   flight_number text not null,
-  airline_iata text not null,
+  airline_iata text,
+  airline_name text,
   origin_iata text not null,
   destination_iata text not null,
   scheduled_departure timestamptz not null,
   scheduled_arrival timestamptz not null,
+  actual_departure timestamptz,
+  actual_arrival timestamptz,
   status text not null default 'scheduled',
   departure_terminal text,
   departure_gate text,
   arrival_terminal text,
   arrival_gate text,
+  origin_time_zone text,
+  destination_time_zone text,
+  aircraft_model text,
+  aircraft_registration text,
+  distance_km numeric,
+  operating_airline_iata text,
+  operating_flight_number text,
+  provider text,
+  provider_record_id text,
+  provider_retrieved_at timestamptz,
   seat text,
-  confirmation_code text,
+  notes text,
+  is_manual boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (user_id, flight_number, scheduled_departure)
+  unique (user_id, flight_number, origin_iata, scheduled_departure)
 );
 ```
 
-An index on `(user_id, scheduled_departure desc)` supports timeline queries.
-
-### Recommended MVP schema evolution
-
-Add:
-
-- `actual_departure timestamptz`
-- `actual_arrival timestamptz`
-- `origin_time_zone text`
-- `destination_time_zone text`
-- `aircraft_model text`
-- `aircraft_registration text`
-- `distance_km numeric`
-- `operating_airline_iata text`
-- `operating_flight_number text`
-- `provider text`
-- `provider_record_id text`
-- `provider_retrieved_at timestamptz`
-- `notes text`
-- `is_manual boolean not null default false`
-
-Remove:
-
-- `confirmation_code`, unless a validated requirement justifies storing booking credentials.
-
-Update uniqueness:
-
-```sql
-unique (user_id, flight_number, origin_iata, scheduled_departure)
-```
+The forward migration removes `confirmation_code`, permits either an airline code or name, validates airport and time fields, and adds the provider and manual-entry fields above. An index on `(user_id, scheduled_departure desc)` supports timeline queries.
 
 ### Canonical flight alternative
 
@@ -412,7 +407,7 @@ This reduces duplicate provider data and enables shared caching. It also adds jo
 
 **Function:** `search-flights`  
 **Method:** `POST`  
-**Authentication:** Public during prototype; authenticated before public release  
+**Authentication:** Required Supabase user token
 **Content type:** `application/json`
 
 Request:
@@ -656,7 +651,7 @@ Disadvantages:
 
 - Supabase Auth issues and refreshes user sessions.
 - Session persistence uses Expo SQLite-backed local storage.
-- Search may remain public only during local or controlled prototype use.
+- Search requires an authenticated Supabase session.
 - Saving, history, editing, deletion, export, and account deletion require authentication.
 
 ### Authorization
@@ -683,7 +678,7 @@ Disadvantages:
 
 Before public distribution:
 
-- Require a valid user token for search, or add persistent IP and user rate limits.
+- Add persistent user and IP rate limits.
 - Limit request frequency and reject duplicate in-flight submissions.
 - Cache recent normalized lookups.
 - Monitor quota consumption and 429 responses.
@@ -796,14 +791,14 @@ Add automated tests and run all checks in CI before treating the project as port
 
 ## 13. Migration and rollout plan
 
-### Phase 1: Search prototype — current
+### Phase 1: Search prototype — complete
 
 - Deploy the public search function.
 - Store the provider secret in Supabase.
 - Validate search manually on iOS and Android.
 - Monitor provider quota through RapidAPI.
 
-### Phase 2: Authenticated history
+### Phase 2: Authenticated history — complete
 
 1. Add schema fields through a forward migration.
 2. Remove `confirmation_code` if no requirement exists.
@@ -851,10 +846,8 @@ Mobile:
 
 ## 15. Open technical decisions
 
-- Authentication method: email/password, magic link, or OAuth.
 - Airport metadata source and update strategy.
 - Client caching library and offline synchronization approach.
 - Rate-limit storage and thresholds.
-- Whether search requires auth immediately or only before public demo.
 - When to split canonical flight instances from user-owned metadata.
 - Monitoring and CI providers.

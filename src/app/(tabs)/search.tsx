@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { router, type Href } from 'expo-router';
 import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
@@ -18,8 +19,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FlightCard } from '@/components/flight-card';
 import { palette, spacing } from '@/constants/theme';
-import { FlightSearchError, searchFlights, toFlightPreview } from '@/lib/flight-search';
-import type { FlightPreview } from '@/types/flight';
+import {
+  FlightSearchError,
+  searchFlights,
+  toFlightPreview,
+  type FlightSearchResult,
+} from '@/lib/flight-search';
+import { useAuth } from '@/providers/auth-provider';
 
 function toIsoDate(date: Date): string {
   const year = date.getFullYear();
@@ -41,9 +47,13 @@ type SearchState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
-  | { kind: 'results'; flights: FlightPreview[] };
+  | {
+      kind: 'results';
+      flights: { result: FlightSearchResult; preview: ReturnType<typeof toFlightPreview> }[];
+    };
 
 export default function SearchScreen() {
+  const { session, isLoading: isSessionLoading } = useAuth();
   const [flightNumber, setFlightNumber] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [step, setStep] = useState<'flight' | 'date'>('flight');
@@ -92,7 +102,10 @@ export default function SearchScreen() {
     setState({ kind: 'loading' });
     try {
       const results = await searchFlights({ flightNumber, date });
-      const flights = results.map((result) => toFlightPreview(result, date));
+      const flights = results.map((result) => ({
+        result,
+        preview: toFlightPreview(result, date),
+      }));
       setState({ kind: 'results', flights });
     } catch (error) {
       const message =
@@ -112,6 +125,25 @@ export default function SearchScreen() {
       >
         <Text style={styles.eyebrow}>TRACK SOMETHING NEW</Text>
         <Text style={styles.title}>Add a flight</Text>
+
+        {isSessionLoading ? (
+          <ActivityIndicator color={palette.accent} />
+        ) : !session ? (
+          <View style={styles.messageCard}>
+            <Text style={styles.messageTitle}>Sign in to add flights</Text>
+            <Text style={styles.messageBody}>
+              Your searches and saved history are tied to your private account.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/profile')}
+              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.buttonText}>Go to sign in</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
 
         {step === 'flight' ? (
           <>
@@ -208,6 +240,7 @@ export default function SearchScreen() {
             <View style={styles.messageCard}>
               <Text style={styles.messageTitle}>Couldn&apos;t search</Text>
               <Text style={styles.messageBody}>{state.message}</Text>
+              <ManualEntryButton />
             </View>
           )}
 
@@ -218,11 +251,25 @@ export default function SearchScreen() {
                 We couldn&apos;t find that flight on the selected date. Double-check the number and
                 date, then try again.
               </Text>
+              <ManualEntryButton />
             </View>
           )}
 
           {state.kind === 'results' &&
-            state.flights.map((flight) => <FlightCard key={flight.id} flight={flight} />)}
+            state.flights.map(({ result, preview }) => (
+              <FlightCard
+                key={preview.id}
+                flight={preview}
+                onPress={() =>
+                  router.push(
+                    {
+                      pathname: '/confirm',
+                      params: { result: JSON.stringify(result) },
+                    } as unknown as Href,
+                  )
+                }
+              />
+            ))}
 
           {state.kind === 'idle' && step === 'flight' && (
             <Text style={styles.hint}>
@@ -230,8 +277,22 @@ export default function SearchScreen() {
             </Text>
           )}
         </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function ManualEntryButton() {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.push('/manual' as Href)}
+      style={({ pressed }) => [styles.manualButton, pressed && styles.buttonPressed]}
+    >
+      <Text style={styles.manualButtonText}>Enter flight manually</Text>
+    </Pressable>
   );
 }
 
@@ -313,4 +374,13 @@ const styles = StyleSheet.create({
   },
   messageTitle: { color: palette.text, fontSize: 17, fontWeight: '700', marginBottom: 6 },
   messageBody: { color: palette.muted, fontSize: 14, lineHeight: 20 },
+  manualButton: {
+    alignItems: 'center',
+    borderColor: palette.borderStrong,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: spacing.md,
+    paddingVertical: 13,
+  },
+  manualButtonText: { color: palette.text, fontSize: 14, fontWeight: '700' },
 });

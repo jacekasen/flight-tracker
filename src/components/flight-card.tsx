@@ -1,11 +1,23 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette, spacing } from '@/constants/theme';
 import type { FlightPreview } from '@/types/flight';
 
-export function FlightCard({ flight }: { flight: FlightPreview }) {
+export function FlightCard({
+  flight,
+  onPress,
+}: {
+  flight: FlightPreview;
+  onPress?: () => void;
+}) {
   return (
-    <View style={styles.card}>
+    <Pressable
+      accessibilityLabel={`${flight.flightNumber}, ${flight.origin} to ${flight.destination}`}
+      accessibilityRole={onPress ? 'button' : undefined}
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+    >
       <View style={styles.topRow}>
         <View>
           <Text style={styles.date}>{flight.dateLabel}</Text>
@@ -36,7 +48,7 @@ export function FlightCard({ flight }: { flight: FlightPreview }) {
         <Text style={styles.detail}>{flight.duration}</Text>
         <Text style={styles.detail}>{flight.aircraft}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -49,6 +61,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.lg,
   },
+  pressed: { opacity: 0.72 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   date: { color: palette.muted, fontSize: 12, fontWeight: '600', marginBottom: 4 },
   number: { color: palette.text, fontSize: 16, fontWeight: '700' },

@@ -4,7 +4,7 @@
 **Document type:** Product Requirements Document (PRD)  
 **Status:** Working draft  
 **Owner:** Jace Kasen  
-**Last updated:** August 22, 2026
+**Last updated:** August 23, 2026
 
 ## 1. Product overview and impact
 
@@ -29,8 +29,12 @@ The application currently supports:
 - AeroDataBox lookup through a Supabase Edge Function.
 - Loading, validation, provider-error, and empty-result states.
 - Normalized results rendered as flight cards.
+- Email/password authentication with persisted sessions and sign-out.
+- Search-result confirmation and duplicate-safe saving.
+- Private upcoming and completed flight history.
+- Flight details, editing, deletion, and manual entry.
 
-The application does not yet support authentication through the UI, saving search results, loading personal history, manual entry, maps, or statistics.
+The application does not yet support maps, statistics, export, or account deletion.
 
 ### Intended impact
 
@@ -159,7 +163,7 @@ Requirements are labeled for traceability between product, design, implementatio
 - FR-1.1: A user must be able to create an account and sign in.
 - FR-1.2: The application must restore a valid session after restart.
 - FR-1.3: A user must be able to sign out.
-- FR-1.4: A signed-out user may search during the prototype phase but must authenticate before saving.
+- FR-1.4: A user must authenticate before searching or saving so provider quota and personal history are tied to an account.
 
 Acceptance criteria:
 
@@ -284,14 +288,14 @@ Acceptance criteria:
 ### Journey A: Add a supported flight
 
 1. User opens Add Flight.
-2. User enters the flight number.
-3. App normalizes and validates the number.
-4. User chooses the departure date.
-5. App displays loading feedback and searches.
-6. User selects the matching itinerary.
-7. User confirms optional seat and notes.
-8. User authenticates if required.
-9. App saves the record and opens the timeline or detail view.
+2. App requires a valid authenticated session.
+3. User enters the flight number.
+4. App normalizes and validates the number.
+5. User chooses the departure date.
+6. App displays loading feedback and searches.
+7. User selects the matching itinerary.
+8. User confirms optional seat and notes.
+9. App saves the record and opens the detail view; the timeline refreshes on focus.
 
 ### Journey B: Recover from no search result
 
@@ -360,7 +364,7 @@ Acceptance criteria:
 
 Milestone: A user can find a supported flight without exposing the provider key.
 
-### Phase 2: Personal history
+### Phase 2: Personal history — complete
 
 - Authentication UI
 - Search-result confirmation
@@ -385,7 +389,7 @@ Milestone: Saved history produces a differentiated visual story.
 
 - Automated tests
 - CI checks
-- Authenticated search and rate limiting
+- Persistent search rate limiting
 - Provider-result caching
 - Data export and account deletion
 - Deployed demo and recorded walkthrough
@@ -423,8 +427,8 @@ Milestone: The project is safe, testable, documented, and easy for a reviewer to
 
 ### Security and privacy risks
 
-**Risk:** The public Edge Function is abused.  
-**Mitigation:** Require authentication or add persistent rate limiting before public distribution.
+**Risk:** Authenticated users abuse the Edge Function and exhaust shared provider quota.
+**Mitigation:** Add persistent per-user and IP rate limits before public distribution.
 
 **Risk:** One user accesses another user's history.  
 **Mitigation:** Enforce RLS and add automated cross-user authorization tests.
@@ -434,7 +438,6 @@ Milestone: The project is safe, testable, documented, and easy for a reviewer to
 
 ## 12. Open product decisions
 
-- Authentication method: email/password, magic link, or OAuth.
 - Whether flight insights use a dedicated tab or a section within Flights.
 - Which airport metadata source provides coordinates and country information.
 - Default distance unit and whether units are configurable.
