@@ -13,6 +13,11 @@ A personal flight-history app built with Expo Router, React Native, TypeScript, 
 
 Search results are currently displayed but are not saved to a user's flight history yet.
 
+Project documentation:
+
+- [`docs/PRODUCT_REQUIREMENTS.md`](docs/PRODUCT_REQUIREMENTS.md) defines the product problem, users, requirements, journeys, success metrics, milestones, and risks.
+- [`docs/DESIGN.md`](docs/DESIGN.md) defines the technical architecture, request flows, data model, API contract, engineering decisions, security, testing, and rollout plan.
+
 ## Requirements
 
 - Node.js 22 LTS (see `.nvmrc`)
