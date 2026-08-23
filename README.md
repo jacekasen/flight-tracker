@@ -1,8 +1,8 @@
 # Flight Tracker
 
-A personal flight-history app built with Expo Router, React Native, TypeScript, and Supabase. The project is designed as a portfolio-scale flight diary: users can look up flights, build a travel history, and eventually explore routes and statistics.
+A personal flight-history app built with Expo Router, React Native, TypeScript, and Supabase. The project is designed as a portfolio-scale flight diary: users can look up flights, build a travel history, and explore routes and statistics.
 
-Phase 1 (flight search) and Phase 2 (authenticated personal history) are implemented. Phase 3 insights and Phase 4 portfolio hardening remain.
+Phase 1 (flight search), Phase 2 (authenticated personal history), and Phase 3 (travel insights) are implemented. Phase 4 portfolio hardening remains.
 
 ## Current features
 
@@ -17,6 +17,10 @@ Phase 1 (flight search) and Phase 2 (authenticated personal history) are impleme
 - Flight details, personal-field editing, manual-itinerary editing, and confirmed deletion
 - Manual flight entry when provider lookup is unavailable
 - Row-level security for all personal flight records
+- Global airport coordinate and country metadata from OurAirports
+- Private route map with distance and flight-time totals
+- Airline, airport, country, and aircraft summaries
+- All-time insights and selectable yearly recaps
 
 Project documentation:
 
@@ -53,7 +57,15 @@ npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push
 ```
 
-The migrations create `profiles` and `flights`, add provider and personal-history fields, remove confirmation codes, create indexes and an auth-profile trigger, and enforce row-level security that isolates every user's data.
+The migrations create `profiles`, `flights`, and the read-only airport reference table; import 4,134 scheduled-service airports; backfill coordinates, countries, and missing route distances; create indexes and enrichment triggers; and enforce row-level security that isolates every user's data.
+
+The airport import is generated from the public-domain [OurAirports dataset](https://ourairports.com/data/). Before this migration is deployed for the first time, its checked-in snapshot can be refreshed with:
+
+```sh
+node scripts/generate-airport-migration.mjs
+```
+
+After the import migration has been deployed, do not rewrite it. Generate a new timestamped migration for later dataset refreshes.
 
 ## Authentication and history
 
@@ -69,6 +81,19 @@ After selecting a search result, the confirmation screen:
 The **Flights** tab queries only records visible through RLS, separates upcoming and completed flights, and refreshes whenever it regains focus. A saved flight can be opened to edit seat or notes, edit a manually entered itinerary, or delete the record after confirmation.
 
 When lookup fails or returns no matches, **Enter flight manually** creates a record without a provider request. Manual entry validates required fields, three-letter airport codes, and arrival-after-departure ordering.
+
+## Travel insights
+
+The **Insights** tab derives every recap from the signed-in user's RLS-protected flight rows. It includes:
+
+- All-time or year-specific flight, distance, and time-aloft totals
+- A native iOS and Android route map, with a web-safe fallback
+- Ranked airline, airport, country, and aircraft summaries
+- Partial-data handling so a missing distance, aircraft, or airport match does not remove the flight from unrelated totals
+
+Airport metadata is optional on each flight during rollout. Applying the Phase 3 migrations backfills existing rows and enriches future inserts automatically.
+
+The native map works in Expo Go. Before producing a standalone Android build, configure a Google Maps SDK for Android key through Expo's `android.config.googleMaps.apiKey`. Restrict the key to the Android application and the Maps SDK rather than treating it as a server-side secret.
 
 ## Flight search
 
@@ -118,28 +143,29 @@ The function requires a valid Supabase user token (`verify_jwt = true` in `supab
 
 ```text
 Expo app
-  -> Supabase Auth session
-  -> Supabase functions.invoke("search-flights")
-  -> Supabase Edge Function
-  -> AeroDataBox via RapidAPI
-  -> normalized flight results
-  -> confirmation and private Postgres history
+  ├─> Supabase Auth session
+  ├─> search-flights Edge Function -> AeroDataBox via RapidAPI
+  │     -> normalized result -> confirmation
+  └─> private Postgres history protected by RLS
+        -> airport enrichment trigger
+        -> timeline and client-side insights
+              ├─> native route map
+              └─> totals, rankings, and yearly recaps
 ```
 
-The Edge Function validates flight numbers and dates, handles provider and quota errors, and tolerates incomplete flight records. The client formats airport-local times and prefers revised or actual times when available.
+The Edge Function validates flight numbers and dates, handles provider and quota errors, and tolerates incomplete flight records. The client formats airport-local times, prefers revised or actual times when available, paginates history, and computes insights only from rows visible to the authenticated user.
 
 ## Delivery status
 
-- Complete: search foundation and authenticated personal history.
-- Next: airport metadata, route map, statistics, summaries, and yearly recap.
+- Complete: search foundation, authenticated personal history, and travel insights.
 - Later: automated tests, CI, rate limiting, provider-result caching, data export, and account deletion.
 
 ## Current limitations
 
 - Search has no persistent per-user rate limiting or provider-result cache.
 - AeroDataBox coverage is not uniform, and the free plan has a limited monthly quota.
-- Manual entry records times in the device time zone until airport metadata is added.
-- Live tracking, notifications, route maps, and flight statistics are future work.
+- Manual-entry date pickers currently interpret times in the device time zone.
+- Live tracking and notifications are out of scope for the portfolio MVP.
 
 ## Project shape
 
@@ -149,8 +175,9 @@ src/components/      Reusable UI
 src/lib/             Supabase client and other integrations
 src/providers/       Persisted authentication state
 src/types/           Database and app-domain types
+scripts/             Repeatable data-generation utilities
 supabase/functions/  Edge Functions (flight search proxy)
-supabase/migrations/ Database schema and RLS
+supabase/migrations/ Database schema, RLS, airport import, and backfill
 ```
 
 ## Useful checks

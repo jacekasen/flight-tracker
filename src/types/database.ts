@@ -23,6 +23,14 @@ export type Database = {
           arrival_gate: string | null;
           origin_time_zone: string | null;
           destination_time_zone: string | null;
+          origin_latitude: number | null;
+          origin_longitude: number | null;
+          origin_country_code: string | null;
+          origin_country_name: string | null;
+          destination_latitude: number | null;
+          destination_longitude: number | null;
+          destination_country_code: string | null;
+          destination_country_name: string | null;
           aircraft_model: string | null;
           aircraft_registration: string | null;
           distance_km: number | null;
@@ -56,6 +64,14 @@ export type Database = {
           arrival_gate?: string | null;
           origin_time_zone?: string | null;
           destination_time_zone?: string | null;
+          origin_latitude?: number | null;
+          origin_longitude?: number | null;
+          origin_country_code?: string | null;
+          origin_country_name?: string | null;
+          destination_latitude?: number | null;
+          destination_longitude?: number | null;
+          destination_country_code?: string | null;
+          destination_country_name?: string | null;
           aircraft_model?: string | null;
           aircraft_registration?: string | null;
           distance_km?: number | null;
@@ -71,6 +87,34 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database['public']['Tables']['flights']['Insert']>;
+        Relationships: [];
+      };
+      airports: {
+        Row: {
+          iata: string;
+          name: string;
+          municipality: string | null;
+          iso_country: string;
+          country_name: string;
+          latitude: number;
+          longitude: number;
+          time_zone: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          iata: string;
+          name: string;
+          municipality?: string | null;
+          iso_country: string;
+          country_name: string;
+          latitude: number;
+          longitude: number;
+          time_zone?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database['public']['Tables']['airports']['Insert']>;
         Relationships: [];
       };
       profiles: {

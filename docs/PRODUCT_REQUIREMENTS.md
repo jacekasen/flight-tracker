@@ -33,8 +33,10 @@ The application currently supports:
 - Search-result confirmation and duplicate-safe saving.
 - Private upcoming and completed flight history.
 - Flight details, editing, deletion, and manual entry.
+- Airport coordinate and country enrichment for saved routes.
+- Private route map, aggregate travel statistics, ranked summaries, and yearly recaps.
 
-The application does not yet support maps, statistics, export, or account deletion.
+The application does not yet support export or account deletion.
 
 ### Intended impact
 
@@ -327,6 +329,7 @@ Acceptance criteria:
 
 - Expo and Expo Router
 - React Native and React
+- React Native Maps
 - TypeScript
 - Supabase JavaScript client
 - Expo SQLite storage adapter
@@ -343,7 +346,7 @@ Acceptance criteria:
 
 - RapidAPI
 - AeroDataBox free plan
-- Airport coordinate and country dataset, to be selected
+- Public-domain OurAirports scheduled-service airport dataset
 
 ### Delivery
 
@@ -375,7 +378,7 @@ Milestone: A user can find a supported flight without exposing the provider key.
 
 Milestone: A user can create and revisit a private flight history.
 
-### Phase 3: Insights
+### Phase 3: Insights — complete
 
 - Airport metadata
 - Route map
@@ -438,8 +441,13 @@ Milestone: The project is safe, testable, documented, and easy for a reviewer to
 
 ## 12. Open product decisions
 
-- Whether flight insights use a dedicated tab or a section within Flights.
-- Which airport metadata source provides coordinates and country information.
-- Default distance unit and whether units are configurable.
+Phase 3 decisions:
+
+- Flight insights use a dedicated tab so map failures and heavier visualization work remain isolated from the history timeline.
+- Airport coordinates and country information come from the public-domain OurAirports scheduled-service dataset.
+- Insights display kilometers until the profile distance-unit preference in FR-7.1 is implemented.
+
+Remaining open decisions:
+
 - Historical range supported by the free provider.
 - Whether bulk CSV import belongs in the portfolio release.

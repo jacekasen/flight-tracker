@@ -28,6 +28,9 @@ type FlightSearchResult = {
     icao: string | null;
     name: string | null;
     municipality: string | null;
+    countryCode: string | null;
+    latitude: number | null;
+    longitude: number | null;
     timeZone: string | null;
     terminal: string | null;
     gate: string | null;
@@ -37,6 +40,9 @@ type FlightSearchResult = {
     icao: string | null;
     name: string | null;
     municipality: string | null;
+    countryCode: string | null;
+    latitude: number | null;
+    longitude: number | null;
     timeZone: string | null;
     terminal: string | null;
     gate: string | null;
@@ -133,6 +139,9 @@ function normalizeFlight(flight: any, index: number): FlightSearchResult {
       icao: departure?.airport?.icao ?? null,
       name: departure?.airport?.name ?? null,
       municipality: departure?.airport?.municipalityName ?? null,
+      countryCode: departure?.airport?.countryCode ?? null,
+      latitude: typeof departure?.airport?.location?.lat === 'number' ? departure.airport.location.lat : null,
+      longitude: typeof departure?.airport?.location?.lon === 'number' ? departure.airport.location.lon : null,
       timeZone: departure?.airport?.timeZone ?? null,
       terminal: departure?.terminal ?? null,
       gate: departure?.gate ?? null,
@@ -142,6 +151,9 @@ function normalizeFlight(flight: any, index: number): FlightSearchResult {
       icao: arrival?.airport?.icao ?? null,
       name: arrival?.airport?.name ?? null,
       municipality: arrival?.airport?.municipalityName ?? null,
+      countryCode: arrival?.airport?.countryCode ?? null,
+      latitude: typeof arrival?.airport?.location?.lat === 'number' ? arrival.airport.location.lat : null,
+      longitude: typeof arrival?.airport?.location?.lon === 'number' ? arrival.airport.location.lon : null,
       timeZone: arrival?.airport?.timeZone ?? null,
       terminal: arrival?.terminal ?? null,
       gate: arrival?.gate ?? null,

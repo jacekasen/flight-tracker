@@ -2,7 +2,7 @@
 
 **Author:** Jace Kasen  
 **Reviewers:** TBD  
-**Status:** Working design  
+**Status:** Implemented through Phase 3
 **Last updated:** August 23, 2026
 **Related document:** [`PRODUCT_REQUIREMENTS.md`](PRODUCT_REQUIREMENTS.md)
 
@@ -12,14 +12,15 @@
 
 This document describes the technical design for Flight Tracker, an Expo mobile application that searches external aviation data through an authenticated Supabase Edge Function and persists private user flight history in Supabase Postgres.
 
-The current implementation completes search and authenticated history:
+The current implementation completes search, authenticated history, and travel insights:
 
 ```text
 Expo app -> Supabase Auth -> Edge Function -> RapidAPI -> AeroDataBox
          -> Postgres with RLS -> private flight timeline
+         -> airport enrichment -> private map, summaries, and recaps
 ```
 
-The next implementation phase adds airport metadata, route visualization, aggregate statistics, and yearly recaps.
+The next implementation phase hardens the portfolio with automated checks, rate limiting, caching, export, and account deletion.
 
 ### Introduction
 
@@ -70,6 +71,9 @@ flowchart TD
   provider[AeroDataBox]
   auth[Supabase Auth]
   database[(Supabase Postgres)]
+  airportData[OurAirports snapshot]
+  insights[Client insight aggregation]
+  map[Native route map]
 
   mobile --> client
   client --> edge
@@ -77,6 +81,10 @@ flowchart TD
   rapid --> provider
   client --> auth
   client --> database
+  airportData --> database
+  database --> insights
+  insights --> map
+  insights --> mobile
 ```
 
 ### Core components
@@ -92,6 +100,7 @@ Technology:
 - Supabase JavaScript client
 - Expo SQLite local-storage adapter
 - React Native community date-time picker
+- React Native Maps
 
 Responsibilities:
 
@@ -104,7 +113,7 @@ Responsibilities:
 - Authentication and persisted session state.
 - Search-result confirmation and duplicate-safe saving.
 - Timeline, flight details, editing, deletion, and manual entry.
-- Future route maps and travel insights.
+- Route maps, aggregate travel insights, and yearly recaps.
 
 Key locations:
 
@@ -113,11 +122,16 @@ Key locations:
 - `src/app/manual.tsx`
 - `src/app/flight/[id].tsx`
 - `src/components/`
+- `src/components/route-map.tsx`
+- `src/components/route-map.native.tsx`
 - `src/lib/flights.ts`
 - `src/lib/flight-search.ts`
+- `src/lib/insights.ts`
 - `src/lib/supabase.ts`
 - `src/providers/auth-provider.tsx`
 - `src/types/`
+- `scripts/generate-airport-migration.mjs`
+- `supabase/migrations/`
 
 #### 2. Search Edge Function
 
@@ -152,6 +166,8 @@ The Profile tab provides email/password account creation, sign-in, and sign-out.
 Responsibilities:
 
 - Store profiles and personal flight records.
+- Store read-only global airport coordinates and countries.
+- Enrich new and existing flights with airport metadata and fallback route distance.
 - Enforce field constraints and duplicate protection.
 - Order history efficiently by user and departure.
 - Enforce ownership through RLS.
@@ -217,6 +233,16 @@ sequenceDiagram
 3. Order by `scheduled_departure`.
 4. Separate upcoming and completed flights in the client or query layer.
 5. Render loading, empty, or error state and support pull-to-refresh.
+
+### Insights load sequence
+
+1. Restore the Supabase session and reuse the paginated, RLS-scoped `loadFlights()` query.
+2. Select all time or an origin-local departure year.
+3. Prefer a stored provider distance, then calculate a Haversine fallback from airport coordinates.
+4. Prefer a complete actual-time pair for duration; otherwise use scheduled UTC timestamps.
+5. Count every selected flight while excluding missing optional values only from the affected metric.
+6. Rank airlines, airport visits, country visits, and aircraft models in the client.
+7. Pass routes with both endpoint coordinates to the native map; use a non-blocking fallback on web.
 
 ## 5. Detailed design
 
@@ -373,6 +399,14 @@ create table public.flights (
   arrival_gate text,
   origin_time_zone text,
   destination_time_zone text,
+  origin_latitude double precision,
+  origin_longitude double precision,
+  origin_country_code text,
+  origin_country_name text,
+  destination_latitude double precision,
+  destination_longitude double precision,
+  destination_country_code text,
+  destination_country_name text,
   aircraft_model text,
   aircraft_registration text,
   distance_km numeric,
@@ -391,6 +425,31 @@ create table public.flights (
 ```
 
 The forward migration removes `confirmation_code`, permits either an airline code or name, validates airport and time fields, and adds the provider and manual-entry fields above. An index on `(user_id, scheduled_departure desc)` supports timeline queries.
+
+#### `airports` and insight enrichment
+
+Phase 3 adds a read-only `airports` reference table generated from the public-domain OurAirports scheduled-service dataset. It stores IATA code, airport and municipality names, ISO country and country name, coordinates, and an optional IANA time zone.
+
+```sql
+create table public.airports (
+  iata text primary key,
+  name text not null,
+  municipality text,
+  iso_country text not null,
+  country_name text not null,
+  latitude double precision not null,
+  longitude double precision not null,
+  time_zone text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+```
+
+The table has RLS enabled with read access for authenticated users. The generated import currently contains 4,134 airports with scheduled service. `scripts/generate-airport-migration.mjs` downloads and deduplicates the source snapshot; a deployed import migration must remain immutable, so later refreshes require a new timestamped migration.
+
+Optional origin and destination coordinate and country fields are denormalized onto each flight. A database trigger enriches future inserts, calculates a great-circle distance when provider distance is absent, and supports a one-time backfill after the airport import. Keeping the fields optional makes the migration backward compatible and allows unknown or newly opened airports to remain valid flight records.
+
+The mobile client loads only the current user's flights through existing RLS, derives totals and rankings client-side, and filters the same rows for yearly recaps. This avoids a second user-owned aggregate surface for the portfolio scale while preserving the option to move aggregation into SQL later.
 
 ### Canonical flight alternative
 
@@ -760,6 +819,10 @@ No alert should include flight details, notes, seats, or credentials.
 - Duration calculation.
 - Status formatting.
 - Database mapping.
+- Insight totals with complete and partial flight records.
+- Stored-distance and coordinate-derived distance handling.
+- Origin-local yearly filtering and date-line edge cases.
+- Airline, airport, country, and aircraft rankings.
 
 ### Integration tests
 
@@ -779,12 +842,16 @@ No alert should include flight details, notes, seats, or credentials.
 - Provider error.
 - Select, confirm, and save.
 - History load and deletion.
+- Insights authentication, loading, empty, and partial-data states.
+- All-time and yearly recap selection.
+- Native route rendering and the web map fallback.
 
 ### Required continuous checks
 
 ```sh
 npm run lint
 npx tsc --noEmit
+npx expo-doctor
 ```
 
 Add automated tests and run all checks in CI before treating the project as portfolio-complete.
@@ -807,12 +874,12 @@ Add automated tests and run all checks in CI before treating the project as port
 5. Test RLS with two separate users.
 6. Require authentication for search before public distribution.
 
-### Phase 3: Insights
+### Phase 3: Insights — complete
 
-1. Select and import airport metadata.
-2. Backfill coordinates and countries for existing flights.
-3. Add aggregate queries or client-side summaries.
-4. Release map and yearly recap behind a feature flag if needed.
+1. Import scheduled-service airport metadata from OurAirports.
+2. Backfill coordinates, countries, and missing distances while preserving provider time zones.
+3. Calculate private aggregate summaries in the client.
+4. Display native route maps and selectable yearly recaps in the Insights tab.
 
 ### Rollback plan
 
@@ -846,7 +913,7 @@ Mobile:
 
 ## 15. Open technical decisions
 
-- Airport metadata source and update strategy.
+- Airport metadata refresh cadence before release.
 - Client caching library and offline synchronization approach.
 - Rate-limit storage and thresholds.
 - When to split canonical flight instances from user-owned metadata.

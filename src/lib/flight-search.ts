@@ -8,6 +8,9 @@ type FlightEndpoint = {
   icao: string | null;
   name: string | null;
   municipality: string | null;
+  countryCode: string | null;
+  latitude: number | null;
+  longitude: number | null;
   timeZone: string | null;
   terminal: string | null;
   gate: string | null;
