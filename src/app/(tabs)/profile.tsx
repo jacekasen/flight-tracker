@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { palette, spacing } from '@/constants/theme';
+import { deleteAccount, exportAccountData } from '@/lib/account';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -25,6 +26,9 @@ export default function ProfileScreen() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   async function submit() {
     if (!email.trim() || !password) {
@@ -73,6 +77,31 @@ export default function ProfileScreen() {
     setMessage(error?.message ?? null);
   }
 
+  async function handleExport() {
+    setIsExporting(true);
+    setMessage(null);
+    try {
+      await exportAccountData();
+      setMessage('Your private flight data export is ready.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not export your data.');
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setIsDeleting(true);
+    setMessage(null);
+    try {
+      await deleteAccount();
+      router.replace('/profile');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not delete your account.');
+      setIsDeleting(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView
@@ -115,9 +144,75 @@ export default function ProfileScreen() {
               <Text style={styles.privateCopy}>
                 Your saved flights are private and protected by row-level security.
               </Text>
+              <View style={styles.dataControls}>
+                <Text style={styles.sectionLabel}>YOUR DATA</Text>
+                <Text style={styles.controlCopy}>
+                  Download your profile and complete flight history as a portable JSON file.
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isExporting || isDeleting}
+                  onPress={handleExport}
+                  style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+                >
+                  {isExporting ? (
+                    <ActivityIndicator color={palette.text} />
+                  ) : (
+                    <Text style={styles.secondaryButtonText}>Export flight data</Text>
+                  )}
+                </Pressable>
+
+                <View style={styles.divider} />
+                <Text style={styles.sectionLabel}>DANGER ZONE</Text>
+                <Text style={styles.controlCopy}>
+                  Deleting your account permanently removes your profile and every saved flight.
+                </Text>
+                {showDeleteConfirmation ? (
+                  <View style={styles.confirmation}>
+                    <Text style={styles.confirmationTitle}>This cannot be undone.</Text>
+                    <View style={styles.confirmationActions}>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={isDeleting}
+                        onPress={() => setShowDeleteConfirmation(false)}
+                        style={({ pressed }) => [
+                          styles.cancelButton,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={styles.secondaryButtonText}>Cancel</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={isDeleting}
+                        onPress={handleDeleteAccount}
+                        style={({ pressed }) => [
+                          styles.deleteButton,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        {isDeleting ? (
+                          <ActivityIndicator color={palette.text} />
+                        ) : (
+                          <Text style={styles.deleteButtonText}>Delete permanently</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isExporting}
+                    onPress={() => setShowDeleteConfirmation(true)}
+                    style={({ pressed }) => [styles.dangerButton, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.dangerButtonText}>Delete account</Text>
+                  </Pressable>
+                )}
+              </View>
               <Pressable
                 accessibilityRole="button"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isExporting || isDeleting}
                 onPress={signOut}
                 style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
               >
@@ -252,9 +347,55 @@ const styles = StyleSheet.create({
     color: palette.muted,
     fontSize: 13,
     lineHeight: 19,
-    marginVertical: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
     textAlign: 'center',
   },
+  dataControls: { gap: 10, marginBottom: spacing.lg, width: '100%' },
+  sectionLabel: {
+    color: palette.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+  controlCopy: { color: palette.muted, fontSize: 13, lineHeight: 19 },
+  divider: { backgroundColor: palette.border, height: 1, marginVertical: spacing.sm },
+  confirmation: {
+    backgroundColor: palette.background,
+    borderColor: palette.warning,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+    padding: spacing.md,
+  },
+  confirmationTitle: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  confirmationActions: { flexDirection: 'row', gap: 10 },
+  cancelButton: {
+    alignItems: 'center',
+    borderColor: palette.borderStrong,
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  deleteButton: {
+    alignItems: 'center',
+    backgroundColor: palette.warning,
+    borderRadius: 12,
+    flex: 1.4,
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  deleteButtonText: { color: palette.background, fontSize: 13, fontWeight: '800' },
+  dangerButton: {
+    alignItems: 'center',
+    borderColor: palette.warning,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 14,
+  },
+  dangerButtonText: { color: palette.warning, fontSize: 15, fontWeight: '700' },
   form: { gap: 12 },
   modeRow: {
     backgroundColor: palette.surface,

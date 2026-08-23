@@ -1,14 +1,22 @@
-// Public Edge Function: looks up flights by number + date via AeroDataBox
-// (RapidAPI) and returns a normalized, app-owned result contract. The provider
-// key is read from the AERODATABOX_API_KEY secret and never leaves the server.
+import { createClient } from 'npm:@supabase/supabase-js@2';
+
+import {
+  isValidDate,
+  normalizeFlight,
+  normalizeFlightNumber,
+  type FlightSearchResult,
+} from './core.ts';
 
 const RAPIDAPI_HOST = 'aerodatabox.p.rapidapi.com';
+const CACHE_TTL_MS = 15 * 60 * 1_000;
+const PROVIDER_TIMEOUT_MS = 8_000;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type, x-retry-count, traceparent, tracestate, baggage',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Expose-Headers': 'Retry-After, X-Cache',
 };
 
 type SearchRequest = {
@@ -16,44 +24,9 @@ type SearchRequest = {
   date?: unknown;
 };
 
-// Normalized result the app depends on. Kept intentionally provider-agnostic.
-type FlightSearchResult = {
-  id: string;
-  flightNumber: string;
-  airlineName: string | null;
-  airlineIata: string | null;
-  status: string;
-  origin: {
-    iata: string | null;
-    icao: string | null;
-    name: string | null;
-    municipality: string | null;
-    countryCode: string | null;
-    latitude: number | null;
-    longitude: number | null;
-    timeZone: string | null;
-    terminal: string | null;
-    gate: string | null;
-  };
-  destination: {
-    iata: string | null;
-    icao: string | null;
-    name: string | null;
-    municipality: string | null;
-    countryCode: string | null;
-    latitude: number | null;
-    longitude: number | null;
-    timeZone: string | null;
-    terminal: string | null;
-    gate: string | null;
-  };
-  departure: { scheduledUtc: string | null; scheduledLocal: string | null; actualUtc: string | null; actualLocal: string | null };
-  arrival: { scheduledUtc: string | null; scheduledLocal: string | null; actualUtc: string | null; actualLocal: string | null };
-  durationMinutes: number | null;
-  distanceKm: number | null;
-  aircraft: { model: string | null; reg: string | null };
-  isCargo: boolean;
-  codeshareStatus: string | null;
+type SearchResponse = {
+  query: { flightNumber: string; date: string };
+  results: FlightSearchResult[];
 };
 
 type ErrorCode =
@@ -61,142 +34,83 @@ type ErrorCode =
   | 'invalid_flight_number'
   | 'invalid_date'
   | 'not_configured'
-  | 'not_found'
+  | 'unauthorized'
+  | 'rate_limited'
   | 'quota_exceeded'
   | 'upstream_error'
   | 'method_not_allowed';
 
-function json(body: unknown, status: number): Response {
+function json(
+  body: unknown,
+  status: number,
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', ...headers },
   });
 }
 
-function fail(code: ErrorCode, message: string, status: number): Response {
-  return json({ error: { code, message } }, status);
+function fail(
+  code: ErrorCode,
+  message: string,
+  status: number,
+  headers: Record<string, string> = {},
+): Response {
+  return json({ error: { code, message } }, status, headers);
 }
 
-// Accepts "UA 120", "ua120", "KL 1395" etc. -> "UA120". Validates that the
-// value looks like an airline prefix + numeric suffix.
-function normalizeFlightNumber(raw: string): string | null {
-  const compact = raw.replace(/\s+/g, '').toUpperCase();
-  if (!/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/.test(compact)) return null;
-  return compact;
+function bearerToken(req: Request): string | null {
+  const authorization = req.headers.get('authorization');
+  const match = authorization?.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] ?? null;
 }
 
-function isValidDate(raw: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
-  const parsed = new Date(`${raw}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return false;
-  // Guard against values like 2026-02-31 that Date silently rolls over.
-  return parsed.toISOString().slice(0, 10) === raw;
-}
-
-function minutesBetween(from: string | null, to: string | null): number | null {
-  if (!from || !to) return null;
-  const start = new Date(from).getTime();
-  const end = new Date(to).getTime();
-  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
-  return Math.round((end - start) / 60000);
-}
-
-// Maps a single AeroDataBox FlightContract to our normalized result. Tolerates
-// missing sections so partially-covered flights still render.
-function normalizeFlight(flight: any, index: number): FlightSearchResult {
-  const departure = flight?.departure ?? {};
-  const arrival = flight?.arrival ?? {};
-
-  const depScheduledUtc = departure?.scheduledTime?.utc ?? null;
-  const depScheduledLocal = departure?.scheduledTime?.local ?? null;
-  const depActualUtc = departure?.revisedTime?.utc ?? departure?.runwayTime?.utc ?? null;
-  const depActualLocal = departure?.revisedTime?.local ?? departure?.runwayTime?.local ?? null;
-
-  const arrScheduledUtc = arrival?.scheduledTime?.utc ?? null;
-  const arrScheduledLocal = arrival?.scheduledTime?.local ?? null;
-  const arrActualUtc = arrival?.revisedTime?.utc ?? arrival?.runwayTime?.utc ?? null;
-  const arrActualLocal = arrival?.revisedTime?.local ?? arrival?.runwayTime?.local ?? null;
-
-  const durationMinutes = minutesBetween(
-    depActualUtc ?? depScheduledUtc,
-    arrActualUtc ?? arrScheduledUtc,
+function clientIp(req: Request): string {
+  const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  return (
+    req.headers.get('cf-connecting-ip')?.trim() ||
+    forwarded ||
+    req.headers.get('x-real-ip')?.trim() ||
+    'unknown'
   );
+}
 
-  const idParts = [
-    flight?.number ?? 'flight',
-    departure?.airport?.iata ?? '',
-    depScheduledUtc ?? String(index),
-  ];
+async function hmacSha256(secret: string, value: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(value));
+  return [...new Uint8Array(signature)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
 
-  return {
-    id: idParts.join('-'),
-    flightNumber: typeof flight?.number === 'string' ? flight.number : '',
-    airlineName: flight?.airline?.name ?? null,
-    airlineIata: flight?.airline?.iata ?? null,
-    status: typeof flight?.status === 'string' ? flight.status : 'Unknown',
-    origin: {
-      iata: departure?.airport?.iata ?? null,
-      icao: departure?.airport?.icao ?? null,
-      name: departure?.airport?.name ?? null,
-      municipality: departure?.airport?.municipalityName ?? null,
-      countryCode: departure?.airport?.countryCode ?? null,
-      latitude: typeof departure?.airport?.location?.lat === 'number' ? departure.airport.location.lat : null,
-      longitude: typeof departure?.airport?.location?.lon === 'number' ? departure.airport.location.lon : null,
-      timeZone: departure?.airport?.timeZone ?? null,
-      terminal: departure?.terminal ?? null,
-      gate: departure?.gate ?? null,
-    },
-    destination: {
-      iata: arrival?.airport?.iata ?? null,
-      icao: arrival?.airport?.icao ?? null,
-      name: arrival?.airport?.name ?? null,
-      municipality: arrival?.airport?.municipalityName ?? null,
-      countryCode: arrival?.airport?.countryCode ?? null,
-      latitude: typeof arrival?.airport?.location?.lat === 'number' ? arrival.airport.location.lat : null,
-      longitude: typeof arrival?.airport?.location?.lon === 'number' ? arrival.airport.location.lon : null,
-      timeZone: arrival?.airport?.timeZone ?? null,
-      terminal: arrival?.terminal ?? null,
-      gate: arrival?.gate ?? null,
-    },
-    departure: {
-      scheduledUtc: depScheduledUtc,
-      scheduledLocal: depScheduledLocal,
-      actualUtc: depActualUtc,
-      actualLocal: depActualLocal,
-    },
-    arrival: {
-      scheduledUtc: arrScheduledUtc,
-      scheduledLocal: arrScheduledLocal,
-      actualUtc: arrActualUtc,
-      actualLocal: arrActualLocal,
-    },
-    durationMinutes,
-    distanceKm: typeof flight?.greatCircleDistance?.km === 'number' ? flight.greatCircleDistance.km : null,
-    aircraft: {
-      model: flight?.aircraft?.model ?? null,
-      reg: flight?.aircraft?.reg ?? null,
-    },
-    isCargo: Boolean(flight?.isCargo),
-    codeshareStatus: flight?.codeshareStatus ?? null,
-  };
+function logSearch(outcome: string, startedAt: number, cache: 'hit' | 'miss' | 'none'): void {
+  console.log(
+    JSON.stringify({
+      event: 'flight_search',
+      outcome,
+      cache,
+      duration_ms: Date.now() - startedAt,
+    }),
+  );
 }
 
 Deno.serve(async (req: Request) => {
+  const startedAt = Date.now();
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   if (req.method !== 'POST') {
     return fail('method_not_allowed', 'Use POST to search for flights.', 405);
-  }
-
-  const apiKey = Deno.env.get('AERODATABOX_API_KEY');
-  if (!apiKey) {
-    return fail(
-      'not_configured',
-      'Flight search is not configured. Set the AERODATABOX_API_KEY secret.',
-      503,
-    );
   }
 
   let payload: SearchRequest;
@@ -220,10 +134,82 @@ Deno.serve(async (req: Request) => {
     return fail('invalid_date', 'Date must be in YYYY-MM-DD format.', 400);
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const ipHashSecret = Deno.env.get('RATE_LIMIT_IP_HASH_SECRET');
+  if (!supabaseUrl || !serviceRoleKey || !ipHashSecret) {
+    logSearch('not_configured', startedAt, 'none');
+    return fail(
+      'not_configured',
+      'Flight search security controls are not configured.',
+      503,
+    );
+  }
+
+  const token = bearerToken(req);
+  if (!token) {
+    return fail('unauthorized', 'Sign in to search for flights.', 401);
+  }
+
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const {
+    data: { user },
+    error: authError,
+  } = await admin.auth.getUser(token);
+  if (authError || !user) {
+    return fail('unauthorized', 'Your session is no longer valid. Sign in again.', 401);
+  }
+
+  const ipHash = await hmacSha256(ipHashSecret, clientIp(req));
+  const { data: rateRows, error: rateError } = await admin.rpc('consume_search_rate_limit', {
+    p_user_id: user.id,
+    p_ip_hash: ipHash,
+  });
+  if (rateError || !Array.isArray(rateRows) || !rateRows[0]) {
+    logSearch('rate_limit_error', startedAt, 'none');
+    return fail('upstream_error', 'Flight search is temporarily unavailable.', 503);
+  }
+
+  const rate = rateRows[0] as { is_allowed: boolean; retry_after_seconds: number };
+  if (!rate.is_allowed) {
+    const retryAfter = Math.max(1, rate.retry_after_seconds);
+    logSearch('rate_limited', startedAt, 'none');
+    return fail(
+      'rate_limited',
+      'Too many searches. Try again after the current hourly window.',
+      429,
+      { 'Retry-After': String(retryAfter) },
+    );
+  }
+
+  const cacheKey = `${flightNumber}:${date}`;
+  const { data: cached, error: cacheReadError } = await admin
+    .from('provider_search_cache')
+    .select('response')
+    .eq('cache_key', cacheKey)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle();
+
+  if (!cacheReadError && cached?.response) {
+    logSearch('success', startedAt, 'hit');
+    return json(cached.response, 200, { 'X-Cache': 'HIT' });
+  }
+
+  const apiKey = Deno.env.get('AERODATABOX_API_KEY');
+  if (!apiKey) {
+    logSearch('not_configured', startedAt, 'miss');
+    return fail(
+      'not_configured',
+      'Flight search is not configured. Set the AERODATABOX_API_KEY secret.',
+      503,
+    );
+  }
+
   const url = new URL(
     `https://${RAPIDAPI_HOST}/flights/number/${encodeURIComponent(flightNumber)}/${date}`,
   );
-  // Keep optional add-ons off to conserve the free quota.
   url.searchParams.set('withAircraftImage', 'false');
   url.searchParams.set('withLocation', 'false');
   url.searchParams.set('dateLocalRole', 'Both');
@@ -236,33 +222,50 @@ Deno.serve(async (req: Request) => {
         'x-rapidapi-key': apiKey,
         'x-rapidapi-host': RAPIDAPI_HOST,
       },
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     });
-  } catch (_error) {
+  } catch {
+    logSearch('provider_unreachable', startedAt, 'miss');
     return fail('upstream_error', 'Could not reach the flight data provider.', 502);
   }
 
-  // AeroDataBox uses 204/404 to signal "no such flight on that date".
-  if (upstream.status === 204 || upstream.status === 404) {
-    return json({ query: { flightNumber, date }, results: [] }, 200);
-  }
-
   if (upstream.status === 429) {
+    logSearch('quota_exceeded', startedAt, 'miss');
     return fail('quota_exceeded', 'Flight search quota reached. Try again later.', 429);
   }
 
-  if (!upstream.ok) {
+  if (upstream.status !== 204 && upstream.status !== 404 && !upstream.ok) {
+    logSearch('provider_error', startedAt, 'miss');
     return fail('upstream_error', 'The flight data provider returned an error.', 502);
   }
 
-  let data: unknown;
-  try {
-    data = await upstream.json();
-  } catch {
-    return fail('upstream_error', 'The flight data provider returned an invalid response.', 502);
+  let results: FlightSearchResult[] = [];
+  if (upstream.status !== 204 && upstream.status !== 404) {
+    let data: unknown;
+    try {
+      data = await upstream.json();
+    } catch {
+      logSearch('malformed_provider_response', startedAt, 'miss');
+      return fail('upstream_error', 'The flight data provider returned an invalid response.', 502);
+    }
+    const flights = Array.isArray(data) ? data : [];
+    results = flights.map((flight, index) => normalizeFlight(flight, index));
   }
 
-  const flights = Array.isArray(data) ? data : [];
-  const results = flights.map((flight, index) => normalizeFlight(flight, index));
+  const response: SearchResponse = {
+    query: { flightNumber, date },
+    results,
+  };
+  const expiresAt = new Date(Date.now() + CACHE_TTL_MS).toISOString();
+  const { error: cacheWriteError } = await admin.from('provider_search_cache').upsert({
+    cache_key: cacheKey,
+    response,
+    expires_at: expiresAt,
+  });
+  if (cacheWriteError) {
+    console.error(JSON.stringify({ event: 'flight_search_cache_write_failed' }));
+  }
 
-  return json({ query: { flightNumber, date }, results }, 200);
+  logSearch(results.length ? 'success' : 'empty', startedAt, 'miss');
+  return json(response, 200, { 'X-Cache': 'MISS' });
 });

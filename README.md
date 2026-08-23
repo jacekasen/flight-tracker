@@ -2,7 +2,7 @@
 
 A personal flight-history app built with Expo Router, React Native, TypeScript, and Supabase. The project is designed as a portfolio-scale flight diary: users can look up flights, build a travel history, and explore routes and statistics.
 
-Phase 1 (flight search), Phase 2 (authenticated personal history), and Phase 3 (travel insights) are implemented. Phase 4 portfolio hardening remains.
+Phases 1–3 and the code-side Phase 4 portfolio hardening are implemented. Publishing a hosted demo or recorded walkthrough is the remaining release artifact.
 
 ## Current features
 
@@ -21,11 +21,16 @@ Phase 1 (flight search), Phase 2 (authenticated personal history), and Phase 3 (
 - Private route map with distance and flight-time totals
 - Airline, airport, country, and aircraft summaries
 - All-time insights and selectable yearly recaps
+- Persistent per-user and HMAC-hashed-IP search rate limits
+- Fifteen-minute normalized provider-result caching
+- Portable private-data export and cascading account deletion
+- Unit, database authorization, and continuous-integration checks
 
 Project documentation:
 
 - [`docs/PRODUCT_REQUIREMENTS.md`](docs/PRODUCT_REQUIREMENTS.md) defines the product problem, users, requirements, journeys, success metrics, milestones, and risks.
 - [`docs/DESIGN.md`](docs/DESIGN.md) defines the technical architecture, request flows, data model, API contract, engineering decisions, security, testing, and rollout plan.
+- [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) provides the safe deployment checklist and three-minute portfolio recording script.
 
 ## Requirements
 
@@ -57,7 +62,7 @@ npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push
 ```
 
-The migrations create `profiles`, `flights`, and the read-only airport reference table; import 4,134 scheduled-service airports; backfill coordinates, countries, and missing route distances; create indexes and enrichment triggers; and enforce row-level security that isolates every user's data.
+The migrations create `profiles`, `flights`, the read-only airport reference table, a server-only provider cache, and persistent search-rate buckets. They import 4,134 scheduled-service airports; backfill coordinates, countries, and missing route distances; create indexes and enrichment triggers; and enforce row-level security that isolates every user's data. A narrowly granted `delete_own_account()` RPC deletes the authenticated Auth user so profile and flight records cascade.
 
 The airport import is generated from the public-domain [OurAirports dataset](https://ourairports.com/data/). Before this migration is deployed for the first time, its checked-in snapshot can be refreshed with:
 
@@ -81,6 +86,8 @@ After selecting a search result, the confirmation screen:
 The **Flights** tab queries only records visible through RLS, separates upcoming and completed flights, and refreshes whenever it regains focus. A saved flight can be opened to edit seat or notes, edit a manually entered itinerary, or delete the record after confirmation.
 
 When lookup fails or returns no matches, **Enter flight manually** creates a record without a provider request. Manual entry validates required fields, three-letter airport codes, and arrival-after-departure ordering.
+
+The signed-in **Profile** tab can export the authenticated profile and all RLS-visible flights as versioned JSON. On iOS and Android it opens the native share sheet; on web it downloads the file. Account deletion requires a second destructive confirmation and permanently removes the Auth user, profile, and cascading flight rows.
 
 ## Travel insights
 
@@ -125,44 +132,55 @@ npx supabase secrets set AERODATABOX_API_KEY="$RAPIDAPI_KEY"
 unset RAPIDAPI_KEY
 ```
 
-4. Deploy the function:
+4. Set a separate random secret used to HMAC IP addresses before rate-limit storage:
+
+```sh
+RATE_LIMIT_SECRET="$(openssl rand -hex 32)"
+npx supabase secrets set RATE_LIMIT_IP_HASH_SECRET="$RATE_LIMIT_SECRET"
+unset RATE_LIMIT_SECRET
+```
+
+5. Deploy the function:
 
 ```sh
 npx supabase functions deploy search-flights
 ```
 
-For local Edge Function development, add `AERODATABOX_API_KEY=your-rapidapi-key` to `supabase/.env.local` (already ignored by Git), then run:
+For local Edge Function development, add `AERODATABOX_API_KEY=your-rapidapi-key` and `RATE_LIMIT_IP_HASH_SECRET=a-long-random-value` to `supabase/.env.local` (already ignored by Git), then run:
 
 ```sh
 npx supabase functions serve search-flights --env-file supabase/.env.local
 ```
 
-The function requires a valid Supabase user token (`verify_jwt = true` in `supabase/config.toml`) and the app requires sign-in before search. It still shares the AeroDataBox free quota (~300 searches/month), so persistent rate limiting and response caching are required before a broader release.
+The function requires a valid Supabase user token (`verify_jwt = true` in `supabase/config.toml`) and validates that token before each search. Valid requests consume persistent fixed-hour limits of 10 requests per user and 30 per HMAC-hashed IP. Normalized results, including empty responses, are cached for 15 minutes before another provider request is allowed.
 
 ## Architecture
 
 ```text
 Expo app
   ├─> Supabase Auth session
-  ├─> search-flights Edge Function -> AeroDataBox via RapidAPI
-  │     -> normalized result -> confirmation
+  ├─> search-flights Edge Function
+  │     -> persistent user/IP limits
+  │     -> normalized provider cache
+  │     -> AeroDataBox via RapidAPI
+  │     -> confirmation
   └─> private Postgres history protected by RLS
         -> airport enrichment trigger
         -> timeline and client-side insights
               ├─> native route map
               └─> totals, rankings, and yearly recaps
+        -> JSON export and cascading account deletion
 ```
 
-The Edge Function validates flight numbers and dates, handles provider and quota errors, and tolerates incomplete flight records. The client formats airport-local times, prefers revised or actual times when available, paginates history, and computes insights only from rows visible to the authenticated user.
+The Edge Function validates the session, flight number, and date; applies persistent abuse controls; serves fresh cache hits; times out provider calls; and returns stable errors for rate, quota, and provider failures. The client formats airport-local times, prefers revised or actual times when available, paginates history and exports, and computes insights only from rows visible to the authenticated user.
 
 ## Delivery status
 
-- Complete: search foundation, authenticated personal history, and travel insights.
-- Later: automated tests, CI, rate limiting, provider-result caching, data export, and account deletion.
+- Complete: search foundation, authenticated personal history, travel insights, automated tests, CI, persistent rate limiting, provider caching, data export, and account deletion.
+- Release artifact: deploy the configured app or record the workflow in [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md).
 
 ## Current limitations
 
-- Search has no persistent per-user rate limiting or provider-result cache.
 - AeroDataBox coverage is not uniform, and the free plan has a limited monthly quota.
 - Manual-entry date pickers currently interpret times in the device time zone.
 - Live tracking and notifications are out of scope for the portfolio MVP.
@@ -177,13 +195,28 @@ src/providers/       Persisted authentication state
 src/types/           Database and app-domain types
 scripts/             Repeatable data-generation utilities
 supabase/functions/  Edge Functions (flight search proxy)
-supabase/migrations/ Database schema, RLS, airport import, and backfill
+supabase/migrations/ Database schema, RLS, caching, limits, airport import, and backfill
+supabase/tests/       pgTAP authorization and cascade tests
+tests/                Vitest unit tests
+.github/workflows/    CI checks
 ```
 
 ## Useful checks
 
 ```sh
 npm run lint
-npx tsc --noEmit
-npx expo-doctor
+npm run typecheck
+npm run test
+npm run doctor
 ```
+
+Run every app-side check with `npm run check`. Database authorization tests require Docker and the Supabase CLI:
+
+```sh
+npx supabase start
+npx supabase test db
+```
+
+GitHub Actions runs the app checks, Deno Edge Function type-checking, and the database test suite for pull requests and pushes to `main`.
+
+The final hosted-demo, recording, and CI URLs belong in [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) once those external release artifacts exist.

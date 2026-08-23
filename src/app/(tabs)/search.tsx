@@ -64,7 +64,7 @@ export default function SearchScreen() {
   function handleContinue() {
     Keyboard.dismiss();
     const normalized = flightNumber.replace(/\s+/g, '').toUpperCase();
-    if (!/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/.test(normalized)) {
+    if (!/^(?:[A-Z][A-Z0-9]|[A-Z0-9][A-Z]|[A-Z]{3})\d{1,4}[A-Z]?$/.test(normalized)) {
       setState({ kind: 'error', message: 'Enter a valid flight number, such as UA 120.' });
       return;
     }

@@ -2,7 +2,7 @@
 
 **Author:** Jace Kasen  
 **Reviewers:** TBD  
-**Status:** Implemented through Phase 3
+**Status:** Phase 4 implementation complete; release artifact pending
 **Last updated:** August 23, 2026
 **Related document:** [`PRODUCT_REQUIREMENTS.md`](PRODUCT_REQUIREMENTS.md)
 
@@ -12,15 +12,18 @@
 
 This document describes the technical design for Flight Tracker, an Expo mobile application that searches external aviation data through an authenticated Supabase Edge Function and persists private user flight history in Supabase Postgres.
 
-The current implementation completes search, authenticated history, and travel insights:
+The current implementation completes search, authenticated history, travel insights, and portfolio hardening:
 
 ```text
 Expo app -> Supabase Auth -> Edge Function -> RapidAPI -> AeroDataBox
          -> Postgres with RLS -> private flight timeline
          -> airport enrichment -> private map, summaries, and recaps
+         -> private export and cascading account deletion
+Edge Function -> persistent user/IP limits -> normalized provider cache
+GitHub Actions -> app, Edge Function, and database authorization checks
 ```
 
-The next implementation phase hardens the portfolio with automated checks, rate limiting, caching, export, and account deletion.
+The remaining release task is to publish the configured demo or record the checked-in walkthrough.
 
 ### Introduction
 
@@ -71,12 +74,16 @@ flowchart TD
   provider[AeroDataBox]
   auth[Supabase Auth]
   database[(Supabase Postgres)]
+  limits[(Rate-limit buckets)]
+  cache[(Provider cache)]
   airportData[OurAirports snapshot]
   insights[Client insight aggregation]
   map[Native route map]
 
   mobile --> client
   client --> edge
+  edge --> limits
+  edge --> cache
   edge --> rapid
   rapid --> provider
   client --> auth
@@ -114,6 +121,7 @@ Responsibilities:
 - Search-result confirmation and duplicate-safe saving.
 - Timeline, flight details, editing, deletion, and manual entry.
 - Route maps, aggregate travel insights, and yearly recaps.
+- Portable JSON export and confirmed account deletion.
 
 Key locations:
 
@@ -127,6 +135,7 @@ Key locations:
 - `src/lib/flights.ts`
 - `src/lib/flight-search.ts`
 - `src/lib/insights.ts`
+- `src/lib/account.ts`
 - `src/lib/supabase.ts`
 - `src/providers/auth-provider.tsx`
 - `src/types/`
@@ -143,12 +152,17 @@ Responsibilities:
 
 - Accept POST and CORS preflight requests.
 - Validate request shape, flight number, and date.
+- Validate the bearer token against Supabase Auth.
 - Normalize flight numbers.
+- Consume persistent per-user and HMAC-hashed-IP rate limits.
+- Return unexpired normalized cache entries without invoking the provider.
 - Read the provider credential from Supabase secrets.
-- Request the AeroDataBox single-day flight-status endpoint.
+- Request the AeroDataBox single-day flight-status endpoint with an eight-second timeout.
 - Disable unnecessary provider add-ons.
 - Normalize provider data into an application-owned contract.
+- Cache successful and empty normalized responses for 15 minutes.
 - Translate provider failures into stable error codes.
+- Emit structured outcome, cache, and latency logs without private flight data.
 
 #### 3. Supabase Auth
 
@@ -171,6 +185,8 @@ Responsibilities:
 - Enforce field constraints and duplicate protection.
 - Order history efficiently by user and departure.
 - Enforce ownership through RLS.
+- Store server-only provider cache records and persistent rate-limit buckets.
+- Delete an authenticated account through a narrowly granted security-definer function.
 
 #### 5. AeroDataBox through RapidAPI
 
@@ -190,6 +206,7 @@ sequenceDiagram
   participant User
   participant App
   participant Edge as Supabase Edge Function
+  participant DB as Supabase Postgres
   participant API as AeroDataBox
 
   User->>App: Enter flight number
@@ -197,10 +214,18 @@ sequenceDiagram
   User->>App: Choose departure date
   User->>App: Submit search
   App->>Edge: POST flightNumber and date
-  Edge->>Edge: Validate request and secret
-  Edge->>API: GET flight status for date
-  API-->>Edge: Provider flight records
-  Edge->>Edge: Normalize records
+  Edge->>Edge: Validate request and bearer token
+  Edge->>DB: Consume user and hashed-IP limit
+  DB-->>Edge: Allowed or retry-after
+  Edge->>DB: Read unexpired normalized cache
+  alt Cache hit
+    DB-->>Edge: Stable result contract
+  else Cache miss
+    Edge->>API: GET flight status for date
+    API-->>Edge: Provider flight records
+    Edge->>Edge: Normalize records
+    Edge->>DB: Upsert 15-minute cache entry
+  end
   Edge-->>App: Stable result contract
   App->>App: Format local display values
   App-->>User: Render matching flight cards
@@ -251,7 +276,7 @@ sequenceDiagram
 Accepted normalized format:
 
 ```regex
-^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$
+^(?:[A-Z][A-Z0-9]|[A-Z0-9][A-Z]|[A-Z]{3})\d{1,4}[A-Z]?$
 ```
 
 Examples:
@@ -259,6 +284,7 @@ Examples:
 - `UA 120` becomes `UA120`.
 - `ua120` becomes `UA120`.
 - `KL 1395` becomes `KL1395`.
+- `3u 8633` becomes `3U8633`.
 
 Validation occurs on both the client and server:
 
@@ -451,6 +477,16 @@ Optional origin and destination coordinate and country fields are denormalized o
 
 The mobile client loads only the current user's flights through existing RLS, derives totals and rankings client-side, and filters the same rows for yearly recaps. This avoids a second user-owned aggregate surface for the portfolio scale while preserving the option to move aggregation into SQL later.
 
+#### Phase 4 server-only tables and account deletion
+
+`provider_search_cache` stores a normalized JSON response by `flight number:date` and an expiry timestamp. `search_rate_limit_buckets` stores fixed one-hour counters by user ID or HMAC-hashed IP. Both tables have RLS enabled, grant no client role access, and are used only through the Edge Function's server-side service-role client.
+
+`consume_search_rate_limit(user_id, ip_hash)` atomically increments both counters and returns an allow decision plus retry delay. The configured thresholds are 10 valid searches per user and 30 per IP each hour. Old buckets are pruned opportunistically.
+
+`delete_own_account()` is executable only by `authenticated`. It derives the user from `auth.uid()` and deletes that row from `auth.users`; existing foreign keys cascade to `profiles` and `flights`. The function is `security definer`, has an empty search path, accepts no caller-selected user ID, and exposes no administrative credential to the client.
+
+Account export does not require a server-side administrative path. The client queries its own profile and paginates all RLS-visible flights, then serializes a versioned JSON document. Native builds write a temporary file and open the share sheet; web downloads a Blob.
+
 ### Canonical flight alternative
 
 A future multi-user design may split:
@@ -528,6 +564,8 @@ Stable error codes:
 - `invalid_flight_number`
 - `invalid_date`
 - `not_configured`
+- `unauthorized`
+- `rate_limited`
 - `quota_exceeded`
 - `upstream_error`
 - `method_not_allowed`
@@ -723,6 +761,8 @@ Disadvantages:
 ### Secrets
 
 - `AERODATABOX_API_KEY` is stored in Supabase secrets.
+- `RATE_LIMIT_IP_HASH_SECRET` is a separate random Supabase secret used only for IP HMACs.
+- `SUPABASE_SERVICE_ROLE_KEY` is supplied by the Edge runtime and never returned or bundled.
 - `EXPO_PUBLIC_` variables may contain only the Supabase project URL and publishable key.
 - Provider errors and logs must not include request headers.
 
@@ -735,12 +775,11 @@ Disadvantages:
 
 ### Abuse prevention
 
-Before public distribution:
-
-- Add persistent user and IP rate limits.
-- Limit request frequency and reject duplicate in-flight submissions.
-- Cache recent normalized lookups.
-- Monitor quota consumption and 429 responses.
+- Persistent database buckets limit valid searches to 10 per user and 30 per IP each hour.
+- IP addresses are HMAC-hashed with a server-only secret before storage.
+- The client rejects duplicate in-flight submissions and the server limits every valid request.
+- Recent normalized lookups, including empty results, are cached for 15 minutes.
+- Provider quota and 429 responses still require operational monitoring.
 
 ## 10. Reliability and edge cases
 
@@ -781,7 +820,7 @@ Test:
 
 ## 11. Monitoring and alerting
 
-The MVP currently has no application monitoring. Add structured logs and lightweight metrics before broader release.
+The Edge Function emits structured search outcome, cache, and latency logs without user IDs, flight details, or credentials. The MVP does not yet aggregate those logs into dashboards or alerts and has no mobile crash reporting; those operational integrations remain prerequisites for a broader production release.
 
 ### System metrics
 
@@ -809,6 +848,8 @@ The MVP currently has no application monitoring. Add structured logs and lightwe
 No alert should include flight details, notes, seats, or credentials.
 
 ## 12. Testing strategy
+
+Current automation includes 19 Vitest cases for search validation, provider normalization, duration, distance, rankings, partial records, and origin-local yearly filtering. The pgTAP suite verifies cross-user flight/profile isolation, server-only access to hardening tables and RPCs, and cascading account deletion. CI also type-checks the Deno Edge Function. Mocked provider HTTP failures, client component tests, and end-to-end device flows remain recommended follow-up coverage.
 
 ### Unit tests
 
@@ -850,17 +891,20 @@ No alert should include flight details, notes, seats, or credentials.
 
 ```sh
 npm run lint
-npx tsc --noEmit
-npx expo-doctor
+npm run typecheck
+npm run test
+npm run doctor
+deno check supabase/functions/search-flights/index.ts
+npx supabase test db
 ```
 
-Add automated tests and run all checks in CI before treating the project as portfolio-complete.
+Vitest covers validation, provider normalization, time and distance calculations, partial data, origin-local yearly filtering, and rankings. pgTAP verifies cross-user RLS, server-only hardening surfaces, and cascading account deletion. GitHub Actions runs all application checks, Edge Function type-checking, and database tests for pull requests and pushes to `main`.
 
 ## 13. Migration and rollout plan
 
 ### Phase 1: Search prototype — complete
 
-- Deploy the public search function.
+- Deploy the search proxy function.
 - Store the provider secret in Supabase.
 - Validate search manually on iOS and Android.
 - Monitor provider quota through RapidAPI.
@@ -880,6 +924,15 @@ Add automated tests and run all checks in CI before treating the project as port
 2. Backfill coordinates, countries, and missing distances while preserving provider time zones.
 3. Calculate private aggregate summaries in the client.
 4. Display native route maps and selectable yearly recaps in the Insights tab.
+
+### Phase 4: Portfolio hardening — implementation complete
+
+1. Add persistent per-user and HMAC-hashed-IP search limits.
+2. Cache normalized provider responses for 15 minutes.
+3. Add private JSON export and cascading account deletion.
+4. Add Vitest, pgTAP authorization tests, and GitHub Actions checks.
+5. Check in a safe deployment and three-minute recording runbook.
+6. Publish the final demo or recording URL as the release artifact.
 
 ### Rollback plan
 
@@ -915,6 +968,5 @@ Mobile:
 
 - Airport metadata refresh cadence before release.
 - Client caching library and offline synchronization approach.
-- Rate-limit storage and thresholds.
 - When to split canonical flight instances from user-owned metadata.
-- Monitoring and CI providers.
+- Monitoring provider and alert delivery.

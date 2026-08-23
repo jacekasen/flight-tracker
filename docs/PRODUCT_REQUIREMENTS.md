@@ -2,7 +2,7 @@
 
 **Product:** Flight Tracker  
 **Document type:** Product Requirements Document (PRD)  
-**Status:** Working draft  
+**Status:** Implemented through Phase 4; release artifact pending
 **Owner:** Jace Kasen  
 **Last updated:** August 23, 2026
 
@@ -36,7 +36,7 @@ The application currently supports:
 - Airport coordinate and country enrichment for saved routes.
 - Private route map, aggregate travel statistics, ranked summaries, and yearly recaps.
 
-The application does not yet support export or account deletion.
+The application also provides portable JSON export, cascading account deletion, persistent search abuse controls, provider-result caching, and automated delivery checks.
 
 ### Intended impact
 
@@ -52,6 +52,7 @@ For the portfolio:
 - Demonstrate secure third-party API integration.
 - Demonstrate authentication, relational data modeling, RLS, and personal-data isolation.
 - Demonstrate thoughtful handling of time zones, incomplete data, and constrained API quotas.
+- Demonstrate automated testing, continuous delivery checks, and user-controlled data portability.
 
 ## 2. Problem statement
 
@@ -333,6 +334,7 @@ Acceptance criteria:
 - TypeScript
 - Supabase JavaScript client
 - Expo SQLite storage adapter
+- Expo FileSystem and Sharing
 - React Native community date-time picker
 
 ### Backend
@@ -341,6 +343,7 @@ Acceptance criteria:
 - Supabase Postgres
 - Supabase Edge Functions
 - Supabase RLS
+- PostgreSQL pgTAP
 
 ### External data
 
@@ -351,7 +354,8 @@ Acceptance criteria:
 ### Delivery
 
 - GitHub repository
-- CI provider, to be selected
+- GitHub Actions
+- Vitest and Deno type-checking
 - Expo development and distribution workflow
 
 ## 10. Milestones and development phases
@@ -388,14 +392,14 @@ Milestone: A user can create and revisit a private flight history.
 
 Milestone: Saved history produces a differentiated visual story.
 
-### Phase 4: Portfolio hardening
+### Phase 4: Portfolio hardening — implementation complete
 
 - Automated tests
 - CI checks
 - Persistent search rate limiting
 - Provider-result caching
 - Data export and account deletion
-- Deployed demo and recorded walkthrough
+- Deployment and recorded-walkthrough runbook; final URLs are release artifacts
 
 Milestone: The project is safe, testable, documented, and easy for a reviewer to evaluate.
 
@@ -431,10 +435,10 @@ Milestone: The project is safe, testable, documented, and easy for a reviewer to
 ### Security and privacy risks
 
 **Risk:** Authenticated users abuse the Edge Function and exhaust shared provider quota.
-**Mitigation:** Add persistent per-user and IP rate limits before public distribution.
+**Mitigation:** Enforce persistent per-user and HMAC-hashed-IP limits and cache normalized provider results.
 
 **Risk:** One user accesses another user's history.  
-**Mitigation:** Enforce RLS and add automated cross-user authorization tests.
+**Mitigation:** Enforce RLS and verify cross-user isolation with automated pgTAP tests in CI.
 
 **Risk:** Sensitive booking information is stored unnecessarily.  
 **Mitigation:** Remove confirmation codes unless a validated product requirement requires them.
@@ -446,6 +450,14 @@ Phase 3 decisions:
 - Flight insights use a dedicated tab so map failures and heavier visualization work remain isolated from the history timeline.
 - Airport coordinates and country information come from the public-domain OurAirports scheduled-service dataset.
 - Insights display kilometers until the profile distance-unit preference in FR-7.1 is implemented.
+
+Phase 4 decisions:
+
+- Search limits use persistent one-hour database buckets: 10 valid requests per user and 30 per HMAC-hashed IP.
+- Normalized provider results, including empty responses, use a 15-minute shared cache.
+- Export uses versioned JSON so all database fields remain portable without lossy CSV flattening.
+- Account deletion is an authenticated security-definer RPC that deletes the Auth user and relies on existing cascades for profile and flight rows.
+- GitHub Actions runs application, Edge Function, and database authorization checks.
 
 Remaining open decisions:
 
