@@ -385,6 +385,12 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Flight search is intentionally public for the MVP so the Add Flight screen can
+# look up flights before auth is wired up. Add auth/rate limiting before a
+# broader release.
+[functions.search-flights]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

@@ -1,15 +1,6 @@
-export type FlightPreview = {
-  id: string;
-  flightNumber: string;
-  dateLabel: string;
-  origin: string;
-  destination: string;
-  departureTime: string;
-  arrivalTime: string;
-  status: string;
-  duration: string;
-  aircraft: string;
-};
+import type { FlightPreview } from '@/types/flight';
+
+export type { FlightPreview };
 
 export const sampleFlights: FlightPreview[] = [
   {

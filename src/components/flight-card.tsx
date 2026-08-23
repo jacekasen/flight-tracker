@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { palette, spacing } from '@/constants/theme';
-import type { FlightPreview } from '@/data/sample-flights';
+import type { FlightPreview } from '@/types/flight';
 
 export function FlightCard({ flight }: { flight: FlightPreview }) {
   return (
