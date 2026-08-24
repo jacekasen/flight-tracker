@@ -1,10 +1,36 @@
 import { Tabs } from 'expo-router';
-import { Text, type ColorValue } from 'react-native';
+import { Text, View, type ColorValue } from 'react-native';
 
 import { palette } from '@/constants/theme';
 
 function TabIcon({ symbol, color }: { symbol: string; color: ColorValue }) {
   return <Text style={{ color, fontSize: 20 }}>{symbol}</Text>;
+}
+
+function ProfileIcon({ color }: { color: ColorValue }) {
+  return (
+    <View style={{ alignItems: 'center', height: 20, justifyContent: 'center', width: 20 }}>
+      <View
+        style={{
+          borderColor: color,
+          borderRadius: 5,
+          borderWidth: 1.8,
+          height: 9,
+          width: 9,
+        }}
+      />
+      <View
+        style={{
+          borderColor: color,
+          borderRadius: 9,
+          borderWidth: 1.8,
+          height: 8,
+          marginTop: 2,
+          width: 17,
+        }}
+      />
+    </View>
+  );
 }
 
 export default function TabsLayout() {
@@ -45,7 +71,7 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <TabIcon symbol="●" color={color} />,
+          tabBarIcon: ({ color }) => <ProfileIcon color={color} />,
         }}
       />
     </Tabs>

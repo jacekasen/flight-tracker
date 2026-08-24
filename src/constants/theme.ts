@@ -10,6 +10,8 @@ export const palette = {
   success: '#51D68A',
   successSoft: '#102C20',
   warning: '#F5B942',
+  danger: '#FF5A67',
+  dangerSoft: '#35181D',
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 } as const;
