@@ -12,6 +12,8 @@
 
 This document describes the technical design for Flight Tracker, an Expo mobile application that searches external aviation data through an authenticated Supabase Edge Function and persists private user flight history in Supabase Postgres.
 
+Flighty was the primary product and interaction reference. This project began because recurring subscription prompts made that product a poor fit for the author's narrower personal needs. Flight Tracker is an independent personal-use implementation, not an attempt to claim an original product category or reproduce Flighty's full commercial service. It is not affiliated with or endorsed by Flighty. This document concentrates on the architecture and engineering decisions implemented in this repository.
+
 The current implementation completes search, authenticated history, travel insights, and portfolio hardening:
 
 ```text
@@ -48,6 +50,7 @@ The architecture uses a provider-independent contract at the Edge Function bound
 - Correctly handle airport-local and UTC timestamps.
 - Tolerate incomplete provider records and provider outages.
 - Support manual records without requiring external data.
+- Adapt the useful parts of the Flighty-inspired workflow to the author's personal needs.
 - Keep the portfolio MVP operationally simple and inexpensive.
 - Provide enough detail for implementation, testing, review, and maintenance.
 
@@ -60,6 +63,8 @@ The architecture uses a provider-independent contract at the Edge Function bound
 - Multi-region backend infrastructure.
 - Premature microservice decomposition.
 - A generalized aviation-data platform.
+- Commercial competition or feature parity with Flighty.
+- Reproducing Flighty's brand identity, proprietary assets, or subscription model.
 
 ## 3. System architecture
 

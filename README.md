@@ -1,8 +1,14 @@
 # Flight Tracker
 
-A personal flight-history app built with Expo Router, React Native, TypeScript, and Supabase. The project is designed as a portfolio-scale flight diary: users can look up flights, build a travel history, and explore routes and statistics.
+A personal flight-history app built with Expo Router, React Native, TypeScript, and Supabase. It lets me look up flights, keep a private travel history, and revisit every route on an interactive globe and in yearly recaps.
 
-Phases 1–3 and the code-side Phase 4 portfolio hardening are implemented. Publishing a hosted demo or recorded walkthrough is the remaining release artifact.
+## Why I built it
+
+[Flighty](https://www.flighty.com/) was the primary product reference. I liked its approach to presenting flight history, but the recurring subscription prompts made it a poor fit for what I wanted: a focused flight diary for my own use. I built this independent implementation so I could own the workflow, data model, and technical decisions behind the experience.
+
+This project does not claim an original product category or feature parity with Flighty, and it is not affiliated with or endorsed by Flighty. Its portfolio value is in independently implementing and adapting the experience across Expo and Supabase: secure flight lookup, private data isolation, real-world flight-number parsing, cross-platform route visualization, and a maintainable application architecture.
+
+The personal-use product and its code-side portfolio hardening are implemented. Publishing a hosted demo or recorded walkthrough is the remaining presentation artifact.
 
 ## Current features
 

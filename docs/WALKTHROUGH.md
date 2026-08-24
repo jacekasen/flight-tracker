@@ -1,6 +1,6 @@
 # Demo and walkthrough
 
-This checklist produces the final Phase 4 release artifact without exposing provider credentials or personal travel data.
+This checklist produces the final portfolio artifact without exposing provider credentials or personal travel data. The presentation should be direct about the project's origin: Flighty was the primary product reference, and recurring subscription prompts motivated an independent, personal-use alternative. Do not present the flight-diary concept as original or imply affiliation with Flighty; focus the engineering story on how the experience was implemented, adapted, secured, and maintained in this codebase.
 
 ## Hosted web demo
 
@@ -22,14 +22,14 @@ Never place the service-role key, AeroDataBox key, or IP-hash secret in an `EXPO
 
 Use a dedicated demo account and fictional notes. Record at a readable mobile viewport.
 
-1. **0:00–0:20 — Authentication:** Start signed out, switch once between the anchored login and sign-up modes, then log in with the dedicated demo account.
-2. **0:20–0:40 — Product framing:** Show the globe-first Flights view and its next-flight panel, then briefly open the upcoming/history list.
+1. **0:00–0:20 — Origin and motivation:** Explain that Flighty inspired the product, but its subscription prompts did not fit a simple personal flight diary, so this project was built independently for personal use.
+2. **0:20–0:40 — Authentication and product framing:** Start signed out, briefly show the anchored login and sign-up modes, then log in and introduce the globe-first Flights view.
 3. **0:40–1:10 — Search:** Enter a flight number and departure date, submit once, and point out that codes such as `R3`, `F9`, and `3U` are parsed correctly.
 4. **1:10–1:35 — Save:** Select a result, add an optional seat or note, confirm it, and show the flight immediately in history.
 5. **1:35–1:55 — History:** Open the flight, demonstrate editable personal fields, and return to the timeline.
 6. **1:55–2:30 — Insights:** Open Flight insights from Profile, show the full-screen all-time globe and its mapped paths, then open Recap and switch between all time and a year.
 7. **2:30–2:50 — Data controls:** Open Profile and demonstrate the JSON export. Explain the two-step cascading account-deletion control without deleting the main demo account.
-8. **2:50–3:00 — Engineering close:** Show the CI result and mention protected routing, persistent rate limits, provider caching, automated authorization tests, and manual-entry fallback.
+8. **2:50–3:00 — Engineering close:** State that the product idea was inspired rather than original, then show the independent engineering work: protected routing, persistent rate limits, provider caching, authorization tests, and manual-entry fallback.
 
 ## Release evidence
 

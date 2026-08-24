@@ -10,7 +10,9 @@
 
 ### Introduction
 
-Flight Tracker is a personal flight-history application for recording past and upcoming flights. It is designed for travelers who want a durable, visual record of where they have flown without maintaining a spreadsheet or relying on temporary airline itineraries.
+Flight Tracker is a personal flight-history application for recording past and upcoming flights. Flighty was the primary product reference: its presentation of flight history was appealing, but recurring subscription prompts made it a poor fit for my narrower needs. The project therefore began as an independent implementation for personal use, preserving the useful flight-diary workflow without a subscription.
+
+The product does not claim an original category or feature parity with Flighty, and it is not affiliated with or endorsed by Flighty. The requirements below describe the scope and decisions of this implementation rather than a claim to have invented the underlying concept.
 
 The product begins with a narrow workflow:
 
@@ -40,11 +42,12 @@ The application also provides portable JSON export, cascading account deletion, 
 
 ### Intended impact
 
-For users:
+For the owner:
 
 - Replace fragmented itinerary records with one personal flight archive.
 - Reduce the effort required to record a flight.
 - Make travel history understandable through a timeline, route map, and summaries.
+- Keep control of the experience and stored history without subscription prompts.
 
 For the portfolio:
 
@@ -59,27 +62,28 @@ For the portfolio:
 ### Primary issues
 
 1. Flight records are distributed across airline accounts, email, calendars, and booking tools.
-2. Airline systems are optimized for upcoming travel, not a durable personal history.
-3. Manually maintaining a flight spreadsheet requires repetitive entry and time-zone handling.
-4. Free aviation APIs have incomplete historical coverage, so lookup cannot be the only input method.
-5. A flight number is reused across dates and may be shared through codeshares, so flight number alone is not a unique record.
+2. Flighty demonstrated an appealing way to organize that history, but its subscription prompts and broader commercial product were unnecessary for this personal workflow.
+3. Airline systems are optimized for upcoming travel, not a durable personal history.
+4. Manually maintaining a flight spreadsheet requires repetitive entry and time-zone handling.
+5. Free aviation APIs have incomplete historical coverage, so lookup cannot be the only input method.
+6. A flight number is reused across dates and may be shared through codeshares, so flight number alone is not a unique record.
 
 ### Product opportunity
 
-A focused mobile diary can combine provider-assisted lookup with manual correction and entry. This delivers most of the value of a personal flight log without attempting airline-grade live operations.
+A focused mobile diary can combine provider-assisted lookup with manual correction and entry. For this project, the opportunity was not to invent a new category or compete commercially; it was to build and own the smaller Flighty-inspired experience the author actually wanted to use.
 
-### Assumptions to validate
+### Working assumptions
 
-- Users usually know the flight number and approximate departure date.
-- Most users add flights individually rather than importing an entire history at once.
-- Route maps and yearly summaries are more valuable for retention than continuous aircraft tracking.
-- Users accept manual correction when provider coverage is incomplete.
+- The owner usually knows the flight number and approximate departure date.
+- Flights are added individually rather than imported as an entire history.
+- Route maps and yearly summaries provide more personal value than continuous aircraft tracking.
+- Manual correction is acceptable when provider coverage is incomplete.
 
-## 3. Target users
+## 3. Intended audience
 
-### Primary persona: personal travel archivist
+### Primary user: the owner
 
-A traveler who wants a simple record of past and upcoming flights.
+The application is built first for its owner: a traveler who wants a simple record of past and upcoming flights without subscribing to a broader commercial product.
 
 Needs:
 
@@ -95,15 +99,15 @@ Pain points:
 - Flight dates and times are easy to enter incorrectly.
 - Spreadsheets are functional but not enjoyable or mobile-friendly.
 
-### Secondary persona: aviation enthusiast
+### Secondary audience: portfolio reviewers
 
-A user interested in aircraft, registrations, routes, and travel statistics.
+Reviewers evaluating the product and engineering work behind an independently implemented, Flighty-inspired experience.
 
 Needs:
 
-- Record aircraft model and registration when available.
-- Filter and summarize flights by airline, airport, aircraft, and year.
-- See routes geographically.
+- Understand the motivation and scope without an inflated originality claim.
+- Evaluate interaction design, cross-platform implementation, backend boundaries, and data isolation.
+- See clear evidence of testing, trade-offs, and maintainability.
 
 ### Out-of-scope personas
 
@@ -115,7 +119,7 @@ Needs:
 
 ### Goals
 
-- Let a user add a supported flight in under one minute.
+- Let the owner add a supported flight in under one minute.
 - Preserve a durable, private history across sessions and devices.
 - Display departure and arrival in the correct airport-local times.
 - Provide manual entry when lookup is unavailable.
@@ -130,13 +134,16 @@ Needs:
 - Predictive delay modeling.
 - Email, calendar, or airline-account import.
 - Public profiles, social feeds, or competitive leaderboards.
+- A subscription or monetization system.
+- Commercial competition or feature parity with Flighty.
+- Reproduction of Flighty's brand identity or proprietary assets.
 
 ## 5. Success metrics
 
-### MVP launch metrics
+### Personal-use readiness
 
-- A first-time user can authenticate and save a flight without developer assistance.
-- Median supported-flight entry time is under 60 seconds.
+- The owner can authenticate and save a flight without developer intervention.
+- A supported flight can be entered in under 60 seconds.
 - At least 90% of valid, provider-supported searches produce a result or a specific actionable error.
 - Saved flights remain available after app restart and sign-in on another session.
 - Automated authorization tests verify that one user cannot access another user's flights.
@@ -149,10 +156,11 @@ Needs:
 - A deployed demo or recorded walkthrough shows search, persistence, history, and insights.
 - Lint, TypeScript, and automated tests pass in CI.
 
-### Long-term product indicators
+### Indicators if the scope expands beyond personal use
 
-- Percentage of users who save a second flight.
-- Average number of flights saved per active user.
+- These are future validation measures, not claims of current adoption.
+- Percentage of people who save a second flight.
+- Average number of flights saved per active account.
 - Percentage of failed searches completed through manual entry.
 - Search-provider error and quota-exhaustion rates.
 - Time from opening Add Flight to successful save.
@@ -412,8 +420,8 @@ Milestone: The project is safe, testable, documented, and easy for a reviewer to
 
 ### Product risks
 
-**Risk:** The app appears to duplicate existing flight apps.  
-**Mitigation:** Focus on personal history, manual completeness, ownership of data, and portfolio-quality insights rather than operational alerts.
+**Risk:** The project is presented as an original product despite closely following Flighty as its primary reference.
+**Mitigation:** Disclose the inspiration and subscription-driven motivation plainly; do not imply affiliation, original category creation, or feature parity. Evaluate the project on its independent implementation, adaptations, technical decisions, and personal usefulness.
 
 **Risk:** The core experience depends too heavily on provider coverage.  
 **Mitigation:** Treat manual entry and correction as required product features.

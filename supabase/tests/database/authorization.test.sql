@@ -95,30 +95,18 @@ select throws_ok(
   'a user cannot insert a flight for another account'
 );
 
-select is(
-  (
-    with changed as (
-      update public.flights
-      set notes = 'not allowed'
-      where id = '10000000-0000-4000-8000-000000000002'
-      returning id
-    )
-    select count(*) from changed
-  ),
-  0::bigint,
+select is_empty(
+  $$ update public.flights
+     set notes = 'not allowed'
+     where id = '10000000-0000-4000-8000-000000000002'
+     returning id $$,
   'a user cannot update another user flight'
 );
 
-select is(
-  (
-    with removed as (
-      delete from public.flights
-      where id = '10000000-0000-4000-8000-000000000002'
-      returning id
-    )
-    select count(*) from removed
-  ),
-  0::bigint,
+select is_empty(
+  $$ delete from public.flights
+     where id = '10000000-0000-4000-8000-000000000002'
+     returning id $$,
   'a user cannot delete another user flight'
 );
 
