@@ -1,10 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
-import { router, useFocusEffect, type Href } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { router } from 'expo-router';
 import {
   ActivityIndicator,
+  LayoutAnimation,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -13,94 +13,62 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RouteMap } from '@/components/route-map';
+import { SymbolIcon } from '@/components/ui/symbol-icon';
 import { layout, palette, radius, spacing, type } from '@/constants/theme';
-import { flightRowToPreview, loadFlights, type FlightRow } from '@/lib/flights';
+import { useFlightCollection } from '@/hooks/use-flight-collection';
+import { partitionFlights } from '@/lib/flight-collections';
+import { flightRowToPreview, type FlightRow } from '@/lib/flights';
 import { summarizeFlights } from '@/lib/insights';
-import { useAuth } from '@/providers/auth-provider';
+import { flightDetailsRoute } from '@/lib/routes';
 
 export default function FlightsScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { session, isLoading: isSessionLoading } = useAuth();
-  const [flights, setFlights] = useState<FlightRow[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [referenceTime, setReferenceTime] = useState(() => Date.now());
-
-  const refresh = useCallback(
-    async (showSpinner = false) => {
-      if (!session) {
-        setFlights([]);
-        return;
-      }
-      if (showSpinner) setIsRefreshing(true);
-      else setIsLoading(true);
-      setMessage(null);
-      setReferenceTime(Date.now());
-      try {
-        setFlights(await loadFlights(session.user.id));
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Could not load your flights.');
-      } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
-      }
-    },
-    [session],
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh]),
-  );
+  const { error, flights, isInitialLoading, isRefreshing, refresh, session } =
+    useFlightCollection({ errorMessage: 'Could not load your flights.' });
+  const [isPanelExpanded, setIsPanelExpanded] = useState(true);
 
   const { upcoming, upcomingRoutes } = useMemo(() => {
-    const next = flights.filter(
-      (flight) => Date.parse(flight.scheduled_departure) >= referenceTime,
-    );
+    const { upcoming: next } = partitionFlights(flights);
     return {
       upcoming: next,
       upcomingRoutes: summarizeFlights(next, null).routes,
     };
-  }, [flights, referenceTime]);
+  }, [flights]);
 
   const nextFlight = upcoming[0];
   const nextFlightPreview = nextFlight ? flightRowToPreview(nextFlight) : null;
 
   function openFlight(flight: FlightRow) {
-    router.push(
-      { pathname: '/flight/[id]', params: { id: flight.id } } as unknown as Href,
-    );
+    router.push(flightDetailsRoute(flight.id));
   }
 
-  if (isSessionLoading || (session && isLoading && flights.length === 0)) {
+  function toggleFlightsPanel() {
+    if (Platform.OS !== 'web') {
+      LayoutAnimation.configureNext({
+        create: {
+          duration: 220,
+          property: LayoutAnimation.Properties.opacity,
+          type: LayoutAnimation.Types.easeInEaseOut,
+        },
+        delete: {
+          duration: 160,
+          property: LayoutAnimation.Properties.opacity,
+          type: LayoutAnimation.Types.easeInEaseOut,
+        },
+        duration: 260,
+        update: { type: LayoutAnimation.Types.easeInEaseOut },
+      });
+    }
+    setIsPanelExpanded((expanded) => !expanded);
+  }
+
+  if (isInitialLoading || !session) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centeredState}>
           <ActivityIndicator color={palette.accent} />
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!session) {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>Flights</Text>
-            </View>
-          </View>
-          <EmptyCard
-            action="Sign in"
-            body="Sign in or create an account to build your flight history across devices."
-            onPress={() => router.push('/profile')}
-            title="Your history starts here"
-          />
-        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -132,11 +100,11 @@ export default function FlightsScreen() {
             </View>
           </View>
 
-          {message && (
+          {error && (
             <View style={styles.floatingError}>
               <View style={styles.errorCopy}>
                 <Text style={styles.errorTitle}>Couldn&apos;t refresh flights</Text>
-                <Text numberOfLines={1} style={styles.errorBody}>{message}</Text>
+                <Text numberOfLines={1} style={styles.errorBody}>{error}</Text>
               </View>
               <Pressable onPress={() => void refresh()}>
                 <Text style={styles.retryText}>Retry</Text>
@@ -151,12 +119,7 @@ export default function FlightsScreen() {
             { width: Math.min(width - 32, 430) },
           ]}
         >
-          <Pressable
-            accessibilityLabel="View all flights"
-            accessibilityRole="button"
-            onPress={() => router.push('/flights')}
-            style={({ pressed }) => [styles.panelHeader, pressed && styles.pressed]}
-          >
+          <View style={styles.panelHeader}>
             <View style={styles.panelIdentity}>
               <View style={styles.panelIcon}>
                 <Text style={styles.panelIconText}>✈</Text>
@@ -175,13 +138,36 @@ export default function FlightsScreen() {
                 </Text>
               </View>
             </View>
-            <View style={styles.expandAction}>
-              <Text style={styles.expandActionText}>View all</Text>
-              <Text style={styles.expandIcon}>›</Text>
+            <View style={styles.panelActions}>
+              <Pressable
+                accessibilityLabel="View all flights"
+                accessibilityRole="button"
+                onPress={() => router.push('/flights')}
+                style={({ pressed }) => [styles.viewAllAction, pressed && styles.pressed]}
+              >
+                <Text style={styles.viewAllActionText}>View all</Text>
+              </Pressable>
+              <Pressable
+                accessibilityLabel={
+                  isPanelExpanded ? 'Collapse upcoming flights' : 'Expand upcoming flights'
+                }
+                accessibilityRole="button"
+                accessibilityState={{ expanded: isPanelExpanded }}
+                hitSlop={6}
+                onPress={toggleFlightsPanel}
+                style={({ pressed }) => [styles.panelToggle, pressed && styles.pressed]}
+              >
+                <SymbolIcon
+                  fallback={isPanelExpanded ? '⌃' : '⌄'}
+                  name={isPanelExpanded ? 'chevron.up' : 'chevron.down'}
+                  size={13}
+                />
+              </Pressable>
             </View>
-          </Pressable>
+          </View>
 
-          <Pressable
+          {isPanelExpanded && (
+            <Pressable
               accessibilityLabel={
                 nextFlightPreview
                   ? `Next flight, ${nextFlightPreview.flightNumber}, ${nextFlightPreview.origin} to ${nextFlightPreview.destination}`
@@ -249,51 +235,17 @@ export default function FlightsScreen() {
                   <Text style={styles.nextChevron}>›</Text>
                 </>
               )}
-          </Pressable>
+            </Pressable>
+          )}
         </View>
       </View>
     </SafeAreaView>
   );
 }
 
-function EmptyCard({
-  title,
-  body,
-  action,
-  onPress,
-}: {
-  title: string;
-  body: string;
-  action: string;
-  onPress: () => void;
-}) {
-  return (
-    <View style={styles.emptyCard}>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyBody}>{body}</Text>
-      <Pressable accessibilityRole="button" onPress={onPress} style={styles.cardButton}>
-        <Text style={styles.cardButtonText}>{action}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
   centeredState: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  content: {
-    gap: spacing.md,
-    paddingBottom: layout.pageBottomPadding,
-    paddingHorizontal: layout.mainTabHorizontal,
-    paddingTop: layout.mainTabHeaderTop,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  title: { color: palette.text, ...type.display },
   mapCanvas: { backgroundColor: '#03070D', flex: 1, overflow: 'hidden' },
   topOverlay: {
     left: 0,
@@ -447,42 +399,23 @@ const styles = StyleSheet.create({
   },
   totalBadgeText: { color: '#C7D0DA', fontSize: 10, fontWeight: '800' },
   panelBody: { color: palette.muted, fontSize: 11, fontWeight: '600', marginTop: 3 },
-  expandAction: {
+  panelActions: { alignItems: 'center', flexDirection: 'row', gap: 7, marginLeft: 10 },
+  viewAllAction: {
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.055)',
     borderRadius: radius.pill,
-    flexDirection: 'row',
-    gap: 4,
-    marginLeft: 10,
+    justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
-  expandActionText: { color: palette.text, fontSize: 10, fontWeight: '800' },
-  expandIcon: { color: palette.accent, fontSize: 16, fontWeight: '800', lineHeight: 16 },
-  pressed: { opacity: 0.68 },
-  emptyCard: {
-    borderColor: palette.border,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    marginTop: spacing.sm,
-  },
-  errorCard: {
-    borderColor: palette.warning,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: spacing.lg,
-  },
-  emptyTitle: { color: palette.text, marginBottom: 6, ...type.title },
-  emptyBody: { color: palette.muted, ...type.body },
-  cardButton: {
+  viewAllActionText: { color: palette.text, fontSize: 10, fontWeight: '800' },
+  panelToggle: {
     alignItems: 'center',
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginTop: spacing.md,
-    paddingVertical: 12,
+    backgroundColor: palette.accentSoft,
+    borderRadius: radius.pill,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
   },
-  cardButtonText: { color: palette.text, ...type.bodyStrong },
+  pressed: { opacity: 0.68 },
 });

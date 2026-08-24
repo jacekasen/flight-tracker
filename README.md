@@ -196,15 +196,16 @@ The Edge Function validates the session, flight number, and date; applies persis
 
 ```text
 src/app/             Expo Router screens and tabs
-src/components/      Reusable UI
-src/lib/             Supabase client and other integrations
+src/components/      Reusable domain and UI primitives
+src/hooks/           Shared authentication and flight-loading state
+src/lib/             Pure domain helpers, route builders, and integrations
 src/providers/       Persisted authentication state
 src/types/           Database and app-domain types
 scripts/             Repeatable data-generation utilities
 supabase/functions/  Edge Functions (flight search proxy)
 supabase/migrations/ Database schema, RLS, caching, limits, airport import, and backfill
 supabase/tests/       pgTAP authorization and cascade tests
-tests/                Vitest unit tests
+tests/                Vitest unit tests for domain and shared utilities
 .github/workflows/    CI checks
 ```
 

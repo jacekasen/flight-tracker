@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { router, useFocusEffect, type Href } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { router } from 'expo-router';
 import {
   Platform,
   Pressable,
@@ -13,13 +13,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { FlightCard } from '@/components/flight-card';
 import { layout, palette, radius, spacing, type } from '@/constants/theme';
-import {
-  flightRowToPreview,
-  getCachedFlights,
-  loadFlights,
-  type FlightRow,
-} from '@/lib/flights';
-import { useAuth } from '@/providers/auth-provider';
+import { useFlightCollection } from '@/hooks/use-flight-collection';
+import { partitionFlights } from '@/lib/flight-collections';
+import { flightRowToPreview, type FlightRow } from '@/lib/flights';
+import { flightDetailsRoute } from '@/lib/routes';
 
 export default function AllFlightsScreen() {
   const insets = useSafeAreaInsets();
@@ -27,75 +24,19 @@ export default function AllFlightsScreen() {
     insets.top,
     Platform.OS === 'ios' ? 44 : Platform.OS === 'android' ? 24 : 0,
   );
-  const { session, isLoading: isSessionLoading } = useAuth();
-  const [flights, setFlights] = useState<FlightRow[]>(
-    () => getCachedFlights(session?.user.id) ?? [],
-  );
+  const { error, flights, isInitialLoading, isRefreshing, refresh, session } =
+    useFlightCollection({ errorMessage: 'Could not load your flights.' });
   const [activeGroup, setActiveGroup] = useState<'upcoming' | 'history'>('upcoming');
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [referenceTime, setReferenceTime] = useState(() => Date.now());
 
-  const refresh = useCallback(
-    async (showSpinner = false) => {
-      if (!session) {
-        setFlights([]);
-        return;
-      }
-      if (showSpinner) setIsRefreshing(true);
-      setMessage(null);
-      setReferenceTime(Date.now());
-      try {
-        setFlights(await loadFlights(session.user.id));
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Could not load your flights.');
-      } finally {
-        setIsRefreshing(false);
-      }
-    },
-    [session],
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh]),
-  );
-
-  useEffect(() => {
-    setFlights(getCachedFlights(session?.user.id) ?? []);
-  }, [session?.user.id]);
-
-  const { upcoming, history } = useMemo(() => {
-    const next = flights.filter(
-      (flight) => Date.parse(flight.scheduled_departure) >= referenceTime,
-    );
-    const previous = flights
-      .filter((flight) => Date.parse(flight.scheduled_departure) < referenceTime)
-      .reverse();
-    return { upcoming: next, history: previous };
-  }, [flights, referenceTime]);
+  const { upcoming, history } = useMemo(() => partitionFlights(flights), [flights]);
 
   const visibleFlights = activeGroup === 'upcoming' ? upcoming : history;
 
   function openFlight(flight: FlightRow) {
-    router.push(
-      { pathname: '/flight/[id]', params: { id: flight.id } } as unknown as Href,
-    );
+    router.push(flightDetailsRoute(flight.id));
   }
 
-  if (isSessionLoading) return <SafeAreaView style={styles.safeArea} />;
-
-  if (!session) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.emptyTitle}>Sign in to view your flights</Text>
-        <Pressable onPress={() => router.replace('/profile')} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Go to sign in</Text>
-        </Pressable>
-      </SafeAreaView>
-    );
-  }
+  if (isInitialLoading || !session) return <SafeAreaView style={styles.safeArea} />;
 
   return (
     <SafeAreaView edges={[]} style={styles.safeArea}>
@@ -170,9 +111,9 @@ export default function AllFlightsScreen() {
           </Text>
         </View>
 
-        {message && (
+        {error && (
           <View style={styles.errorBanner}>
-            <Text numberOfLines={1} style={styles.errorText}>{message}</Text>
+            <Text numberOfLines={1} style={styles.errorText}>{error}</Text>
             <Pressable onPress={() => void refresh()}>
               <Text style={styles.retryText}>Retry</Text>
             </Pressable>
@@ -244,14 +185,6 @@ function GroupButton({
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: palette.background, flex: 1 },
   pageScroll: { flex: 1 },
-  centered: {
-    alignItems: 'center',
-    backgroundColor: palette.background,
-    flex: 1,
-    gap: spacing.md,
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
   content: {
     alignSelf: 'center',
     flexGrow: 1,

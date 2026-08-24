@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FlightCard } from '@/components/flight-card';
 import { layout, palette, radius, spacing, type } from '@/constants/theme';
+import { formatDate, toIsoDate } from '@/lib/dates';
 import {
   FlightSearchError,
   searchFlights,
@@ -26,23 +27,7 @@ import {
   type FlightSearchResult,
 } from '@/lib/flight-search';
 import { normalizeFlightNumberInput } from '@/lib/flight-number';
-import { useAuth } from '@/providers/auth-provider';
-
-function toIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function formatSelectedDate(date: Date): string {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
-}
+import { confirmFlightRoute } from '@/lib/routes';
 
 type SearchState =
   | { kind: 'idle' }
@@ -54,7 +39,6 @@ type SearchState =
     };
 
 export default function SearchScreen() {
-  const { session, isLoading: isSessionLoading } = useAuth();
   const [flightNumber, setFlightNumber] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [step, setStep] = useState<'flight' | 'date'>('flight');
@@ -129,24 +113,7 @@ export default function SearchScreen() {
           <Text style={styles.subtitle}>Find your itinerary by flight number and departure date.</Text>
         </View>
 
-        {isSessionLoading ? (
-          <ActivityIndicator color={palette.accent} />
-        ) : !session ? (
-          <View style={styles.messageCard}>
-            <Text style={styles.messageTitle}>Sign in to add flights</Text>
-            <Text style={styles.messageBody}>
-              Your searches and saved history are tied to your account.
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/profile')}
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.buttonText}>Go to sign in</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <>
+        <>
             <View style={styles.searchCard}>
               {step === 'flight' ? (
                 <>
@@ -218,7 +185,7 @@ export default function SearchScreen() {
                       <Text style={styles.calendarIcon}>▦</Text>
                       <View style={styles.dateButtonText}>
                         <Text style={styles.dateButtonLabel}>Departure date</Text>
-                        <Text style={styles.dateButtonValue}>{formatSelectedDate(selectedDate)}</Text>
+                        <Text style={styles.dateButtonValue}>{formatDate(selectedDate)}</Text>
                       </View>
                       <Text style={styles.chevron}>›</Text>
                     </Pressable>
@@ -269,18 +236,12 @@ export default function SearchScreen() {
                     key={preview.id}
                     flight={preview}
                     onPress={() =>
-                      router.push(
-                        {
-                          pathname: '/confirm',
-                          params: { result: JSON.stringify(result) },
-                        } as unknown as Href,
-                      )
+                      router.push(confirmFlightRoute(result))
                     }
                   />
                 ))}
             </View>
-          </>
-        )}
+        </>
       </ScrollView>
     </SafeAreaView>
   );
@@ -290,7 +251,7 @@ function ManualEntryButton() {
   return (
     <Pressable
       accessibilityRole="button"
-      onPress={() => router.push('/manual' as Href)}
+      onPress={() => router.push('/manual')}
       style={({ pressed }) => [styles.manualButton, pressed && styles.buttonPressed]}
     >
       <Text style={styles.manualButtonText}>Enter flight manually</Text>

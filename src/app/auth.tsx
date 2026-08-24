@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,106 +13,28 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { layout, palette, radius, spacing, type } from '@/constants/theme';
-import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
-
-type AuthMode = 'signIn' | 'signUp';
-type Notice = { kind: 'error' | 'success'; text: string };
-
-function friendlyAuthError(message: string): string {
-  const normalized = message.toLowerCase();
-  if (normalized.includes('invalid login credentials')) return 'Email or password is incorrect.';
-  if (normalized.includes('email not confirmed')) return 'Confirm your email before logging in.';
-  if (normalized.includes('user already registered')) return 'An account already exists for this email.';
-  if (normalized.includes('rate limit')) return 'Too many attempts. Wait a moment and try again.';
-  return message;
-}
+import { useAuthForm } from '@/hooks/use-auth-form';
 
 export default function AuthScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 860;
-  const [mode, setMode] = useState<AuthMode>('signIn');
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [notice, setNotice] = useState<Notice | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRecovering, setIsRecovering] = useState(false);
-
-  function changeMode(nextMode: AuthMode) {
-    setMode(nextMode);
-    setNotice(null);
-    setPassword('');
-    setShowPassword(false);
-  }
-
-  async function submit() {
-    if (!isSupabaseConfigured) {
-      setNotice({ kind: 'error', text: 'Add your Supabase project URL and publishable key to continue.' });
-      return;
-    }
-    if (!email.trim() || !password) {
-      setNotice({ kind: 'error', text: 'Enter your email and password.' });
-      return;
-    }
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setNotice({ kind: 'error', text: 'Enter a valid email address.' });
-      return;
-    }
-    if (mode === 'signUp' && !fullName.trim()) {
-      setNotice({ kind: 'error', text: 'Enter your name.' });
-      return;
-    }
-    if (mode === 'signUp' && password.length < 8) {
-      setNotice({ kind: 'error', text: 'Create a password with at least 8 characters.' });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setNotice(null);
-    const supabase = getSupabase();
-    const result =
-      mode === 'signIn'
-        ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
-        : await supabase.auth.signUp({
-            email: email.trim(),
-            password,
-            options: { data: { full_name: fullName.trim() } },
-          });
-
-    setIsSubmitting(false);
-    if (result.error) {
-      setNotice({ kind: 'error', text: friendlyAuthError(result.error.message) });
-      return;
-    }
-    if (!result.data.session) {
-      setNotice({ kind: 'success', text: 'Check your email to confirm your account, then log in.' });
-      setMode('signIn');
-      setPassword('');
-    }
-  }
-
-  async function recoverPassword() {
-    const normalizedEmail = email.trim();
-    if (!isSupabaseConfigured) {
-      setNotice({ kind: 'error', text: 'Add your Supabase configuration to continue.' });
-      return;
-    }
-    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      setNotice({ kind: 'error', text: 'Enter your email first, then request a reset link.' });
-      return;
-    }
-
-    setIsRecovering(true);
-    setNotice(null);
-    const { error } = await getSupabase().auth.resetPasswordForEmail(normalizedEmail);
-    setIsRecovering(false);
-    setNotice(
-      error
-        ? { kind: 'error', text: friendlyAuthError(error.message) }
-        : { kind: 'success', text: 'Password reset link sent. Check your email.' },
-    );
-  }
+  const {
+    changeMode,
+    email,
+    fullName,
+    isRecovering,
+    isSubmitting,
+    mode,
+    notice,
+    password,
+    recoverPassword,
+    setEmail,
+    setFullName,
+    setPassword,
+    setShowPassword,
+    showPassword,
+    submit,
+  } = useAuthForm();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -156,138 +77,138 @@ export default function AuthScreen() {
               </View>
 
               <View style={styles.formCard}>
-              <View style={styles.modeRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: mode === 'signIn' }}
-                  onPress={() => changeMode('signIn')}
-                  style={[styles.modeButton, mode === 'signIn' && styles.modeButtonActive]}
-                >
-                  <Text style={[styles.modeText, mode === 'signIn' && styles.modeTextActive]}>
-                    Log in
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: mode === 'signUp' }}
-                  onPress={() => changeMode('signUp')}
-                  style={[styles.modeButton, mode === 'signUp' && styles.modeButtonActive]}
-                >
-                  <Text style={[styles.modeText, mode === 'signUp' && styles.modeTextActive]}>
-                    Sign up
-                  </Text>
-                </Pressable>
-              </View>
-
-              {mode === 'signUp' && (
-                <View style={styles.field}>
-                  <Text style={styles.label}>FULL NAME</Text>
-                  <TextInput
-                    accessibilityLabel="Full name"
-                    autoComplete="name"
-                    editable={!isSubmitting}
-                    onChangeText={setFullName}
-                    placeholder="Your name"
-                    placeholderTextColor={palette.muted}
-                    style={styles.input}
-                    value={fullName}
-                  />
-                </View>
-              )}
-
-              <View style={styles.field}>
-                <Text style={styles.label}>EMAIL</Text>
-                <TextInput
-                  accessibilityLabel="Email"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  keyboardType="email-address"
-                  onChangeText={setEmail}
-                  placeholder="you@example.com"
-                  placeholderTextColor={palette.muted}
-                  style={styles.input}
-                  value={email}
-                  editable={!isSubmitting && !isRecovering}
-                />
-              </View>
-
-              <View style={styles.field}>
-                <View style={styles.passwordLabelRow}>
-                  <Text style={styles.label}>PASSWORD</Text>
-                  {mode === 'signIn' && (
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={isSubmitting || isRecovering}
-                      onPress={() => void recoverPassword()}
-                    >
-                      <Text style={styles.forgotText}>
-                        {isRecovering ? 'Sending…' : 'Forgot password?'}
-                      </Text>
-                    </Pressable>
-                  )}
-                </View>
-                <View style={styles.passwordInputShell}>
-                  <TextInput
-                    accessibilityLabel="Password"
-                    autoCapitalize="none"
-                    autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
-                    editable={!isSubmitting && !isRecovering}
-                    onChangeText={setPassword}
-                    onSubmitEditing={submit}
-                    placeholder={mode === 'signIn' ? 'Enter your password' : 'At least 8 characters'}
-                    placeholderTextColor={palette.muted}
-                    secureTextEntry={!showPassword}
-                    style={styles.passwordInput}
-                    value={password}
-                  />
+                <View style={styles.modeRow}>
                   <Pressable
-                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                     accessibilityRole="button"
-                    hitSlop={8}
-                    onPress={() => setShowPassword((visible) => !visible)}
-                    style={styles.passwordToggle}
+                    accessibilityState={{ selected: mode === 'signIn' }}
+                    onPress={() => changeMode('signIn')}
+                    style={[styles.modeButton, mode === 'signIn' && styles.modeButtonActive]}
                   >
-                    <Text style={styles.passwordToggleText}>{showPassword ? 'Hide' : 'Show'}</Text>
+                    <Text style={[styles.modeText, mode === 'signIn' && styles.modeTextActive]}>
+                      Log in
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: mode === 'signUp' }}
+                    onPress={() => changeMode('signUp')}
+                    style={[styles.modeButton, mode === 'signUp' && styles.modeButtonActive]}
+                  >
+                    <Text style={[styles.modeText, mode === 'signUp' && styles.modeTextActive]}>
+                      Sign up
+                    </Text>
                   </Pressable>
                 </View>
+
                 {mode === 'signUp' && (
-                  <Text style={styles.fieldHint}>Use 8 or more characters.</Text>
+                  <View style={styles.field}>
+                    <Text style={styles.label}>FULL NAME</Text>
+                    <TextInput
+                      accessibilityLabel="Full name"
+                      autoComplete="name"
+                      editable={!isSubmitting}
+                      onChangeText={setFullName}
+                      placeholder="Your name"
+                      placeholderTextColor={palette.muted}
+                      style={styles.input}
+                      value={fullName}
+                    />
+                  </View>
                 )}
-              </View>
 
-              {notice && (
-                <View
-                  accessibilityLiveRegion="polite"
-                  style={[styles.notice, notice.kind === 'success' && styles.noticeSuccess]}
-                >
-                  <Text
-                    style={[
-                      styles.noticeText,
-                      notice.kind === 'success' && styles.noticeSuccessText,
-                    ]}
-                  >
-                    {notice.text}
-                  </Text>
+                <View style={styles.field}>
+                  <Text style={styles.label}>EMAIL</Text>
+                  <TextInput
+                    accessibilityLabel="Email"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    editable={!isSubmitting && !isRecovering}
+                    keyboardType="email-address"
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    placeholderTextColor={palette.muted}
+                    style={styles.input}
+                    value={email}
+                  />
                 </View>
-              )}
 
-              <Pressable
-                accessibilityRole="button"
-                disabled={isSubmitting || isRecovering}
-                onPress={submit}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  (pressed || isSubmitting || isRecovering) && styles.pressed,
-                ]}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color={palette.background} />
-                ) : (
-                  <Text style={styles.primaryButtonText}>
-                    {mode === 'signIn' ? 'Log in' : 'Create account'}
-                  </Text>
+                <View style={styles.field}>
+                  <View style={styles.passwordLabelRow}>
+                    <Text style={styles.label}>PASSWORD</Text>
+                    {mode === 'signIn' && (
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={isSubmitting || isRecovering}
+                        onPress={() => void recoverPassword()}
+                      >
+                        <Text style={styles.forgotText}>
+                          {isRecovering ? 'Sending…' : 'Forgot password?'}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                  <View style={styles.passwordInputShell}>
+                    <TextInput
+                      accessibilityLabel="Password"
+                      autoCapitalize="none"
+                      autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
+                      editable={!isSubmitting && !isRecovering}
+                      onChangeText={setPassword}
+                      onSubmitEditing={submit}
+                      placeholder={mode === 'signIn' ? 'Enter your password' : 'At least 8 characters'}
+                      placeholderTextColor={palette.muted}
+                      secureTextEntry={!showPassword}
+                      style={styles.passwordInput}
+                      value={password}
+                    />
+                    <Pressable
+                      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={() => setShowPassword((visible) => !visible)}
+                      style={styles.passwordToggle}
+                    >
+                      <Text style={styles.passwordToggleText}>{showPassword ? 'Hide' : 'Show'}</Text>
+                    </Pressable>
+                  </View>
+                  {mode === 'signUp' && (
+                    <Text style={styles.fieldHint}>Use 8 or more characters.</Text>
+                  )}
+                </View>
+
+                {notice && (
+                  <View
+                    accessibilityLiveRegion="polite"
+                    style={[styles.notice, notice.kind === 'success' && styles.noticeSuccess]}
+                  >
+                    <Text
+                      style={[
+                        styles.noticeText,
+                        notice.kind === 'success' && styles.noticeSuccessText,
+                      ]}
+                    >
+                      {notice.text}
+                    </Text>
+                  </View>
                 )}
-              </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isSubmitting || isRecovering}
+                  onPress={() => void submit()}
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    (pressed || isSubmitting || isRecovering) && styles.pressed,
+                  ]}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color={palette.background} />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>
+                      {mode === 'signIn' ? 'Log in' : 'Create account'}
+                    </Text>
+                  )}
+                </Pressable>
               </View>
 
               <Text style={styles.footerText}>

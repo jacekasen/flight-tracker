@@ -1,22 +1,22 @@
 import { useMemo, useState } from 'react';
-import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FlightCard } from '@/components/flight-card';
+import { ActionButton } from '@/components/ui/action-button';
+import { FormField } from '@/components/ui/form-field';
 import { layout, palette, radius, spacing, type } from '@/constants/theme';
 import { toFlightPreview, type FlightSearchResult } from '@/lib/flight-search';
 import { FlightDataError, saveFlight, searchResultToInsert } from '@/lib/flights';
+import { flightDetailsRoute } from '@/lib/routes';
 import { useAuth } from '@/providers/auth-provider';
 
 function parseResult(value: string | string[] | undefined): FlightSearchResult | null {
@@ -62,9 +62,7 @@ export default function ConfirmFlightScreen() {
     try {
       const insert = searchResultToInsert(result, session.user.id, { seat, notes });
       const saved = await saveFlight(insert);
-      router.replace(
-        { pathname: '/flight/[id]', params: { id: saved.id } } as unknown as Href,
-      );
+      router.replace(flightDetailsRoute(saved.id));
     } catch (error) {
       setMessage(
         error instanceof FlightDataError
@@ -81,9 +79,7 @@ export default function ConfirmFlightScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centered}>
           <Text style={styles.errorTitle}>Flight result unavailable</Text>
-          <Pressable onPress={() => router.back()} style={styles.secondaryButton}>
-            <Text style={styles.secondaryText}>Return to search</Text>
-          </Pressable>
+          <ActionButton label="Return to search" onPress={() => router.back()} variant="secondary" />
         </View>
       </SafeAreaView>
     );
@@ -124,50 +120,38 @@ export default function ConfirmFlightScreen() {
 
           <View style={styles.formCard}>
             <Text style={styles.formTitle}>Personal details</Text>
-            <Text style={styles.label}>SEAT · OPTIONAL</Text>
-            <TextInput
+            <FormField
               accessibilityLabel="Seat"
               autoCapitalize="characters"
+              label="SEAT · OPTIONAL"
               onChangeText={setSeat}
               placeholder="e.g. 14A"
-              placeholderTextColor={palette.muted}
-              style={styles.input}
               value={seat}
             />
-            <Text style={styles.label}>NOTES · OPTIONAL</Text>
-            <TextInput
+            <FormField
               accessibilityLabel="Personal notes"
+              label="NOTES · OPTIONAL"
               multiline
               onChangeText={setNotes}
               placeholder="Trip, companions, memories…"
-              placeholderTextColor={palette.muted}
-              style={[styles.input, styles.notesInput]}
-              textAlignVertical="top"
               value={notes}
             />
           </View>
 
           {message && <Text style={styles.message}>{message}</Text>}
           {!session && (
-            <Pressable onPress={() => router.push('/profile')} style={styles.secondaryButton}>
-              <Text style={styles.secondaryText}>Sign in to save</Text>
-            </Pressable>
+            <ActionButton
+              label="Sign in to save"
+              onPress={() => router.push('/profile')}
+              variant="secondary"
+            />
           )}
-          <Pressable
-            accessibilityRole="button"
+          <ActionButton
             disabled={isSaving || !session}
-            onPress={save}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              (pressed || isSaving || !session) && styles.pressed,
-            ]}
-          >
-            {isSaving ? (
-              <ActivityIndicator color={palette.background} />
-            ) : (
-              <Text style={styles.primaryText}>Save to my flights</Text>
-            )}
-          </Pressable>
+            label="Save to my flights"
+            loading={isSaving}
+            onPress={() => void save()}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -204,34 +188,6 @@ const styles = StyleSheet.create({
   },
   formTitle: { color: palette.text, marginBottom: 4, ...type.title },
   label: { color: palette.muted, ...type.label },
-  input: {
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    color: palette.text,
-    fontSize: type.button.fontSize,
-    minHeight: layout.controlHeight,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-  },
-  notesInput: { minHeight: 100 },
   message: { color: palette.warning, fontSize: 13, lineHeight: 19 },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: palette.accent,
-    borderRadius: radius.md,
-    justifyContent: 'center',
-    minHeight: layout.controlHeight,
-  },
-  primaryText: { color: palette.background, ...type.button },
-  secondaryButton: {
-    alignItems: 'center',
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingVertical: 14,
-  },
-  secondaryText: { color: palette.text, ...type.bodyStrong },
-  pressed: { opacity: 0.6 },
   errorTitle: { color: palette.text, fontSize: 22, fontWeight: '800' },
 });

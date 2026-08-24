@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { router, useFocusEffect } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { router } from 'expo-router';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,50 +11,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EmptyStateCard } from '@/components/ui/empty-state-card';
 import { layout, palette, radius, spacing, type } from '@/constants/theme';
-import { loadFlights, type FlightRow } from '@/lib/flights';
+import { useFlightCollection } from '@/hooks/use-flight-collection';
 import {
   availableInsightYears,
   formatFlightTime,
   summarizeFlights,
   type InsightRanking,
 } from '@/lib/insights';
-import { useAuth } from '@/providers/auth-provider';
 
 export default function InsightsScreen() {
-  const { session, isLoading: isSessionLoading } = useAuth();
-  const [flights, setFlights] = useState<FlightRow[]>([]);
+  const { error, flights, isInitialLoading, isRefreshing, refresh, session } =
+    useFlightCollection({ errorMessage: 'Could not load your insights.' });
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const refresh = useCallback(
-    async (showRefresh = false) => {
-      if (!session) {
-        setFlights([]);
-        return;
-      }
-      if (showRefresh) setIsRefreshing(true);
-      else setIsLoading(true);
-      setMessage(null);
-      try {
-        setFlights(await loadFlights(session.user.id));
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Could not load your insights.');
-      } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
-      }
-    },
-    [session],
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh]),
-  );
 
   const years = useMemo(() => availableInsightYears(flights), [flights]);
   const insights = useMemo(
@@ -94,24 +64,17 @@ export default function InsightsScreen() {
           {selectedYear != null && <Text style={styles.recapBadge}>{selectedYear} RECAP</Text>}
         </View>
 
-        {isSessionLoading || (isLoading && flights.length === 0) ? (
+        {isInitialLoading || !session ? (
           <ActivityIndicator color={palette.accent} />
-        ) : !session ? (
-          <EmptyState
-            action="Sign in"
-            body="Sign in to view your route map and travel totals."
-            onPress={() => router.back()}
-            title="Sign in to see insights"
-          />
-        ) : message && flights.length === 0 ? (
-          <EmptyState
+        ) : error && flights.length === 0 ? (
+          <EmptyStateCard
             action="Try again"
-            body={message}
+            body={error}
             onPress={() => void refresh()}
             title="Couldn't load insights"
           />
         ) : flights.length === 0 ? (
-          <EmptyState
+          <EmptyStateCard
             action="Add a flight"
             body="Save a flight to start building your map and yearly recaps."
             onPress={() => router.push('/search')}
@@ -119,7 +82,7 @@ export default function InsightsScreen() {
           />
         ) : (
           <>
-            {message && <Text style={styles.message}>{message}</Text>}
+            {error && <Text style={styles.message}>{error}</Text>}
 
             <Text style={styles.recapIntro}>Choose a chapter from your travel history.</Text>
             <ScrollView
@@ -263,28 +226,6 @@ function RankingCard({
       ) : (
         <Text style={styles.unavailable}>Not available yet</Text>
       )}
-    </View>
-  );
-}
-
-function EmptyState({
-  title,
-  body,
-  action,
-  onPress,
-}: {
-  title: string;
-  body: string;
-  action: string;
-  onPress: () => void;
-}) {
-  return (
-    <View style={styles.emptyCard}>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyBody}>{body}</Text>
-      <Pressable accessibilityRole="button" onPress={onPress} style={styles.emptyButton}>
-        <Text style={styles.emptyButtonText}>{action}</Text>
-      </Pressable>
     </View>
   );
 }
@@ -440,24 +381,4 @@ const styles = StyleSheet.create({
   rankingCount: { color: palette.muted, fontSize: 12, fontWeight: '700' },
   unavailable: { color: palette.muted, fontSize: 13, fontStyle: 'italic' },
   message: { color: palette.warning, fontSize: 13 },
-  emptyCard: {
-    borderColor: palette.border,
-    borderRadius: radius.lg,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-  },
-  emptyTitle: { color: palette.text, ...type.title },
-  emptyBody: { color: palette.muted, marginTop: spacing.sm, ...type.body },
-  emptyButton: {
-    alignItems: 'center',
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    marginTop: spacing.md,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  emptyButtonText: { color: palette.text, ...type.bodyStrong },
 });

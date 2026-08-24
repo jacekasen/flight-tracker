@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,6 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FlightCard } from '@/components/flight-card';
 import { layout, palette, radius, spacing, type } from '@/constants/theme';
+import { confirmDestructiveAction } from '@/lib/confirmation';
+import { formatDateTime } from '@/lib/dates';
+import { toErrorMessage } from '@/lib/errors';
 import {
   deleteFlight,
   flightRowToPreview,
@@ -23,19 +25,8 @@ import {
   updateFlight,
   type FlightRow,
 } from '@/lib/flights';
+import { manualFlightRoute } from '@/lib/routes';
 import { useAuth } from '@/providers/auth-provider';
-
-function formatDateTime(value: string, timeZone: string | null): string {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      timeZone: timeZone ?? undefined,
-    }).format(new Date(value));
-  } catch {
-    return new Date(value).toLocaleString();
-  }
-}
 
 export default function FlightDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,7 +50,7 @@ export default function FlightDetailScreen() {
         setNotes(data.notes ?? '');
       })
       .catch((error) => {
-        if (active) setMessage(error instanceof Error ? error.message : 'Could not load flight.');
+        if (active) setMessage(toErrorMessage(error, 'Could not load flight.'));
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -81,7 +72,7 @@ export default function FlightDetailScreen() {
       setFlight(updated);
       setMessage('Changes saved.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not save changes.');
+      setMessage(toErrorMessage(error, 'Could not save changes.'));
     } finally {
       setIsSaving(false);
     }
@@ -89,26 +80,20 @@ export default function FlightDetailScreen() {
 
   function confirmDelete() {
     if (!flight) return;
-    Alert.alert(
-      'Delete flight?',
-      `${flight.flight_number} will be permanently removed from your history.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            setIsSaving(true);
-            void deleteFlight(flight.id)
-              .then(() => router.replace('/'))
-              .catch((error) => {
-                setMessage(error instanceof Error ? error.message : 'Could not delete flight.');
-                setIsSaving(false);
-              });
-          },
-        },
-      ],
-    );
+    confirmDestructiveAction({
+      confirmLabel: 'Delete',
+      message: `${flight.flight_number} will be permanently removed from your history.`,
+      onConfirm: () => {
+        setIsSaving(true);
+        void deleteFlight(flight.id)
+          .then(() => router.replace('/'))
+          .catch((error) => {
+            setMessage(toErrorMessage(error, 'Could not delete flight.'));
+            setIsSaving(false);
+          });
+      },
+      title: 'Delete flight?',
+    });
   }
 
   if (isSessionLoading || (session && isLoading)) {
@@ -152,9 +137,7 @@ export default function FlightDetailScreen() {
               <Pressable
                 accessibilityRole="button"
                 onPress={() =>
-                  router.push(
-                    { pathname: '/manual', params: { id: flight.id } } as unknown as Href,
-                  )
+                  router.push(manualFlightRoute(flight.id))
                 }
                 style={styles.editButton}
               >

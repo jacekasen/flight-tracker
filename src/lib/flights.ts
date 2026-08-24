@@ -1,4 +1,5 @@
 import { getSupabase } from '@/lib/supabase';
+import { trimmedOrNull } from '@/lib/strings';
 import type { FlightSearchResult } from '@/lib/flight-search';
 import type { Database } from '@/types/database';
 import type { FlightPreview } from '@/types/flight';
@@ -36,11 +37,6 @@ export class FlightDataError extends Error {
     this.name = 'FlightDataError';
     this.code = code;
   }
-}
-
-function nullable(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
 }
 
 function requireAirport(value: string | null, label: string): string {
@@ -87,8 +83,8 @@ export function searchResultToInsert(
   return {
     user_id: userId,
     flight_number: result.flightNumber.replace(/\s+/g, '').toUpperCase(),
-    airline_iata: nullable(result.airlineIata?.toUpperCase()),
-    airline_name: nullable(result.airlineName),
+    airline_iata: trimmedOrNull(result.airlineIata?.toUpperCase()),
+    airline_name: trimmedOrNull(result.airlineName),
     origin_iata: requireAirport(result.origin.iata, 'Origin'),
     destination_iata: requireAirport(result.destination.iata, 'Destination'),
     scheduled_departure: scheduledDeparture,
@@ -100,26 +96,26 @@ export function searchResultToInsert(
       ? requireTimestamp(result.arrival.actualUtc, 'Actual arrival')
       : null,
     status: result.status || 'scheduled',
-    departure_terminal: nullable(result.origin.terminal),
-    departure_gate: nullable(result.origin.gate),
-    arrival_terminal: nullable(result.destination.terminal),
-    arrival_gate: nullable(result.destination.gate),
-    origin_time_zone: nullable(result.origin.timeZone),
-    destination_time_zone: nullable(result.destination.timeZone),
+    departure_terminal: trimmedOrNull(result.origin.terminal),
+    departure_gate: trimmedOrNull(result.origin.gate),
+    arrival_terminal: trimmedOrNull(result.destination.terminal),
+    arrival_gate: trimmedOrNull(result.destination.gate),
+    origin_time_zone: trimmedOrNull(result.origin.timeZone),
+    destination_time_zone: trimmedOrNull(result.destination.timeZone),
     origin_latitude: result.origin.latitude,
     origin_longitude: result.origin.longitude,
-    origin_country_code: nullable(result.origin.countryCode?.toUpperCase()),
+    origin_country_code: trimmedOrNull(result.origin.countryCode?.toUpperCase()),
     destination_latitude: result.destination.latitude,
     destination_longitude: result.destination.longitude,
-    destination_country_code: nullable(result.destination.countryCode?.toUpperCase()),
-    aircraft_model: nullable(result.aircraft.model),
-    aircraft_registration: nullable(result.aircraft.reg),
+    destination_country_code: trimmedOrNull(result.destination.countryCode?.toUpperCase()),
+    aircraft_model: trimmedOrNull(result.aircraft.model),
+    aircraft_registration: trimmedOrNull(result.aircraft.reg),
     distance_km: result.distanceKm,
     provider: 'aerodatabox',
     provider_record_id: result.id,
     provider_retrieved_at: new Date().toISOString(),
-    seat: nullable(personal.seat),
-    notes: nullable(personal.notes),
+    seat: trimmedOrNull(personal.seat),
+    notes: trimmedOrNull(personal.notes),
     is_manual: false,
   };
 }

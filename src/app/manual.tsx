@@ -3,7 +3,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,12 +12,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ActionButton } from '@/components/ui/action-button';
+import { FormField } from '@/components/ui/form-field';
 import { layout, palette, radius, spacing, type } from '@/constants/theme';
+import { toErrorMessage } from '@/lib/errors';
 import {
   FlightDataError,
   loadFlight,
@@ -26,15 +28,12 @@ import {
   type FlightInsert,
 } from '@/lib/flights';
 import { normalizeFlightNumberInput } from '@/lib/flight-number';
+import { flightDetailsRoute } from '@/lib/routes';
+import { trimmedOrNull } from '@/lib/strings';
 import { useAuth } from '@/providers/auth-provider';
 
 type FieldName = 'flightNumber' | 'airline' | 'origin' | 'destination' | 'time';
 type Errors = Partial<Record<FieldName, string>>;
-
-function clean(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed || null;
-}
 
 function DateTimeField({
   label,
@@ -118,7 +117,7 @@ export default function ManualEntryScreen() {
         setNotes(flight.notes ?? '');
       })
       .catch((error) => {
-        if (active) setMessage(error instanceof Error ? error.message : 'Could not load flight.');
+        if (active) setMessage(toErrorMessage(error, 'Could not load flight.'));
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -167,8 +166,8 @@ export default function ManualEntryScreen() {
       origin_time_zone: deviceTimeZone,
       destination_time_zone: deviceTimeZone,
       status: 'scheduled',
-      seat: clean(seat),
-      notes: clean(notes),
+      seat: trimmedOrNull(seat),
+      notes: trimmedOrNull(notes),
       is_manual: true,
     };
   }
@@ -195,9 +194,7 @@ export default function ManualEntryScreen() {
             notes: insert.notes,
           })
         : await saveFlight(insert);
-      router.replace(
-        { pathname: '/flight/[id]', params: { id: saved.id } } as unknown as Href,
-      );
+      router.replace(flightDetailsRoute(saved.id));
     } catch (error) {
       setMessage(
         error instanceof FlightDataError
@@ -231,14 +228,18 @@ export default function ManualEntryScreen() {
             <ActivityIndicator color={palette.accent} />
           ) : (
           <View style={styles.form}>
-            <Field
+            <FormField
+              autoCapitalize="characters"
+              autoCorrect={false}
               error={errors.flightNumber}
               label="FLIGHT NUMBER"
               onChangeText={setFlightNumber}
               placeholder="UA120"
               value={flightNumber}
             />
-            <Field
+            <FormField
+              autoCapitalize="characters"
+              autoCorrect={false}
               error={errors.airline}
               label="AIRLINE NAME OR IATA CODE"
               onChangeText={setAirline}
@@ -247,7 +248,9 @@ export default function ManualEntryScreen() {
             />
             <View style={styles.twoColumns}>
               <View style={styles.column}>
-                <Field
+                <FormField
+                  autoCapitalize="characters"
+                  autoCorrect={false}
                   error={errors.origin}
                   label="ORIGIN"
                   maxLength={3}
@@ -257,7 +260,9 @@ export default function ManualEntryScreen() {
                 />
               </View>
               <View style={styles.column}>
-                <Field
+                <FormField
+                  autoCapitalize="characters"
+                  autoCorrect={false}
                   error={errors.destination}
                   label="DESTINATION"
                   maxLength={3}
@@ -270,21 +275,20 @@ export default function ManualEntryScreen() {
             <DateTimeField label="DEPARTURE" onChange={setDeparture} value={departure} />
             <DateTimeField label="ARRIVAL" onChange={setArrival} value={arrival} />
             {errors.time && <Text style={styles.error}>{errors.time}</Text>}
-            <Field
+            <FormField
+              autoCapitalize="characters"
+              autoCorrect={false}
               label="SEAT · OPTIONAL"
               onChangeText={setSeat}
               placeholder="14A"
               value={seat}
             />
-            <Text style={styles.label}>NOTES · OPTIONAL</Text>
-            <TextInput
+            <FormField
               accessibilityLabel="Notes"
+              label="NOTES · OPTIONAL"
               multiline
               onChangeText={setNotes}
               placeholder="Trip, companions, memories…"
-              placeholderTextColor={palette.muted}
-              style={[styles.input, styles.notesInput]}
-              textAlignVertical="top"
               value={notes}
             />
           </View>
@@ -292,56 +296,21 @@ export default function ManualEntryScreen() {
 
           {message && <Text style={styles.message}>{message}</Text>}
           {!session && (
-            <Pressable onPress={() => router.push('/profile')} style={styles.secondaryButton}>
-              <Text style={styles.secondaryText}>Sign in</Text>
-            </Pressable>
+            <ActionButton
+              label="Sign in"
+              onPress={() => router.push('/profile')}
+              variant="secondary"
+            />
           )}
-          <Pressable
-            accessibilityRole="button"
+          <ActionButton
             disabled={isSaving || isLoading || !session}
-            onPress={submit}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              (pressed || isSaving || isLoading || !session) && styles.pressed,
-            ]}
-          >
-            {isSaving ? (
-              <ActivityIndicator color={palette.background} />
-            ) : (
-              <Text style={styles.primaryText}>{id ? 'Save changes' : 'Save manual flight'}</Text>
-            )}
-          </Pressable>
+            label={id ? 'Save changes' : 'Save manual flight'}
+            loading={isSaving}
+            onPress={() => void submit()}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  );
-}
-
-function Field({
-  label,
-  error,
-  ...props
-}: {
-  label: string;
-  error?: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  placeholder: string;
-  maxLength?: number;
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        autoCapitalize="characters"
-        autoCorrect={false}
-        placeholderTextColor={palette.muted}
-        style={[styles.input, error && styles.inputError]}
-        {...props}
-      />
-      {error && <Text style={styles.error}>{error}</Text>}
-    </View>
   );
 }
 
@@ -353,20 +322,7 @@ const styles = StyleSheet.create({
   title: { color: palette.text, ...type.display },
   helper: { color: palette.muted, ...type.body },
   form: { gap: 14, marginTop: spacing.sm },
-  field: { gap: 7 },
   label: { color: palette.muted, ...type.label },
-  input: {
-    backgroundColor: palette.surface,
-    borderColor: palette.border,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    color: palette.text,
-    fontSize: type.button.fontSize,
-    minHeight: layout.controlHeight,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-  },
-  inputError: { borderColor: palette.warning },
   error: { color: palette.warning, fontSize: 12 },
   twoColumns: { flexDirection: 'row', gap: 12 },
   column: { flex: 1 },
@@ -387,23 +343,5 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   dateButtonText: { color: palette.text, fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  notesInput: { minHeight: 100 },
   message: { color: palette.warning, fontSize: 13, lineHeight: 19 },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: palette.accent,
-    borderRadius: radius.md,
-    justifyContent: 'center',
-    minHeight: layout.controlHeight,
-  },
-  primaryText: { color: palette.background, ...type.button },
-  secondaryButton: {
-    alignItems: 'center',
-    borderColor: palette.borderStrong,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingVertical: 14,
-  },
-  secondaryText: { color: palette.text, ...type.bodyStrong },
-  pressed: { opacity: 0.6 },
 });

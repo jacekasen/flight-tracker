@@ -131,9 +131,13 @@ Key locations:
 - `src/app/manual.tsx`
 - `src/app/flight/[id].tsx`
 - `src/components/`
+- `src/components/ui/`
 - `src/components/route-map.tsx`
 - `src/components/route-map.native.tsx`
+- `src/hooks/use-auth-form.ts`
+- `src/hooks/use-flight-collection.ts`
 - `src/lib/flights.ts`
+- `src/lib/flight-collections.ts`
 - `src/lib/flight-search.ts`
 - `src/lib/flight-number.ts`
 - `src/lib/insights.ts`
@@ -143,6 +147,15 @@ Key locations:
 - `src/types/`
 - `scripts/generate-airport-migration.mjs`
 - `supabase/migrations/`
+
+Maintainability boundaries:
+
+- Route files compose screens and keep screen-specific presentation local.
+- Reusable controls live in `src/components/ui`; domain-specific components remain in `src/components`.
+- Hooks own repeated asynchronous UI state, including session-aware flight loading and authentication forms.
+- Pure formatting, validation, grouping, error, and route helpers live in focused `src/lib` modules.
+- Supabase reads and writes remain behind integration modules such as `flights.ts`, `account.ts`, and `supabase.ts`.
+- Provider normalization accepts `unknown` input and validates each field before producing the app-owned contract.
 
 #### 2. Search Edge Function
 
@@ -857,7 +870,7 @@ No alert should include flight details, notes, seats, or credentials.
 
 ## 12. Testing strategy
 
-Current automation includes 30 Vitest cases for flight-number parsing, search validation, provider normalization, duration, distance, rankings, partial records, and origin-local yearly filtering. The pgTAP suite verifies cross-user flight/profile isolation, server-only access to hardening tables and RPCs, and cascading account deletion. CI also type-checks the Deno Edge Function. Mocked provider HTTP failures, client component tests, and end-to-end device flows remain recommended follow-up coverage.
+Current automation includes 35 Vitest cases for flight-number parsing, search validation, provider normalization, duration, distance, rankings, partial records, origin-local yearly filtering, and shared utility behavior. The pgTAP suite verifies cross-user flight/profile isolation, server-only access to hardening tables and RPCs, and cascading account deletion. CI also type-checks the Deno Edge Function. Mocked provider HTTP failures, client component tests, and end-to-end device flows remain recommended follow-up coverage.
 
 ### Unit tests
 

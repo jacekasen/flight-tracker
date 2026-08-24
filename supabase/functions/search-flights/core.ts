@@ -58,21 +58,63 @@ export function minutesBetween(from: string | null, to: string | null): number |
   return Math.round((end - start) / 60_000);
 }
 
+function valueAt(source: unknown, path: readonly string[]): unknown {
+  let value = source;
+  for (const key of path) {
+    if (typeof value !== 'object' || value === null || !(key in value)) return undefined;
+    value = (value as Record<string, unknown>)[key];
+  }
+  return value;
+}
+
+function stringAt(source: unknown, path: readonly string[]): string | null {
+  const value = valueAt(source, path);
+  return typeof value === 'string' ? value : null;
+}
+
+function numberAt(source: unknown, path: readonly string[]): number | null {
+  const value = valueAt(source, path);
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function endpoint(source: unknown, movement: 'departure' | 'arrival'): FlightEndpoint {
+  const airport = [movement, 'airport'] as const;
+  return {
+    iata: stringAt(source, [...airport, 'iata']),
+    icao: stringAt(source, [...airport, 'icao']),
+    name: stringAt(source, [...airport, 'name']),
+    municipality: stringAt(source, [...airport, 'municipalityName']),
+    countryCode: stringAt(source, [...airport, 'countryCode']),
+    latitude: numberAt(source, [...airport, 'location', 'lat']),
+    longitude: numberAt(source, [...airport, 'location', 'lon']),
+    timeZone: stringAt(source, [...airport, 'timeZone']),
+    terminal: stringAt(source, [movement, 'terminal']),
+    gate: stringAt(source, [movement, 'gate']),
+  };
+}
+
 // Maps one AeroDataBox record to the app-owned contract while tolerating
 // optional and partially-covered provider fields.
-export function normalizeFlight(flight: any, index: number): FlightSearchResult {
-  const departure = flight?.departure ?? {};
-  const arrival = flight?.arrival ?? {};
-
-  const depScheduledUtc = departure?.scheduledTime?.utc ?? null;
-  const depScheduledLocal = departure?.scheduledTime?.local ?? null;
-  const depActualUtc = departure?.revisedTime?.utc ?? departure?.runwayTime?.utc ?? null;
-  const depActualLocal = departure?.revisedTime?.local ?? departure?.runwayTime?.local ?? null;
-
-  const arrScheduledUtc = arrival?.scheduledTime?.utc ?? null;
-  const arrScheduledLocal = arrival?.scheduledTime?.local ?? null;
-  const arrActualUtc = arrival?.revisedTime?.utc ?? arrival?.runwayTime?.utc ?? null;
-  const arrActualLocal = arrival?.revisedTime?.local ?? arrival?.runwayTime?.local ?? null;
+export function normalizeFlight(flight: unknown, index: number): FlightSearchResult {
+  const flightNumber = stringAt(flight, ['number']) ?? '';
+  const origin = endpoint(flight, 'departure');
+  const destination = endpoint(flight, 'arrival');
+  const depScheduledUtc = stringAt(flight, ['departure', 'scheduledTime', 'utc']);
+  const depScheduledLocal = stringAt(flight, ['departure', 'scheduledTime', 'local']);
+  const depActualUtc =
+    stringAt(flight, ['departure', 'revisedTime', 'utc']) ??
+    stringAt(flight, ['departure', 'runwayTime', 'utc']);
+  const depActualLocal =
+    stringAt(flight, ['departure', 'revisedTime', 'local']) ??
+    stringAt(flight, ['departure', 'runwayTime', 'local']);
+  const arrScheduledUtc = stringAt(flight, ['arrival', 'scheduledTime', 'utc']);
+  const arrScheduledLocal = stringAt(flight, ['arrival', 'scheduledTime', 'local']);
+  const arrActualUtc =
+    stringAt(flight, ['arrival', 'revisedTime', 'utc']) ??
+    stringAt(flight, ['arrival', 'runwayTime', 'utc']);
+  const arrActualLocal =
+    stringAt(flight, ['arrival', 'revisedTime', 'local']) ??
+    stringAt(flight, ['arrival', 'runwayTime', 'local']);
 
   const durationMinutes = minutesBetween(
     depActualUtc ?? depScheduledUtc,
@@ -81,46 +123,16 @@ export function normalizeFlight(flight: any, index: number): FlightSearchResult 
 
   return {
     id: [
-      flight?.number ?? 'flight',
-      departure?.airport?.iata ?? '',
+      flightNumber || 'flight',
+      origin.iata ?? '',
       depScheduledUtc ?? String(index),
     ].join('-'),
-    flightNumber: typeof flight?.number === 'string' ? flight.number : '',
-    airlineName: flight?.airline?.name ?? null,
-    airlineIata: flight?.airline?.iata ?? null,
-    status: typeof flight?.status === 'string' ? flight.status : 'Unknown',
-    origin: {
-      iata: departure?.airport?.iata ?? null,
-      icao: departure?.airport?.icao ?? null,
-      name: departure?.airport?.name ?? null,
-      municipality: departure?.airport?.municipalityName ?? null,
-      countryCode: departure?.airport?.countryCode ?? null,
-      latitude:
-        typeof departure?.airport?.location?.lat === 'number'
-          ? departure.airport.location.lat
-          : null,
-      longitude:
-        typeof departure?.airport?.location?.lon === 'number'
-          ? departure.airport.location.lon
-          : null,
-      timeZone: departure?.airport?.timeZone ?? null,
-      terminal: departure?.terminal ?? null,
-      gate: departure?.gate ?? null,
-    },
-    destination: {
-      iata: arrival?.airport?.iata ?? null,
-      icao: arrival?.airport?.icao ?? null,
-      name: arrival?.airport?.name ?? null,
-      municipality: arrival?.airport?.municipalityName ?? null,
-      countryCode: arrival?.airport?.countryCode ?? null,
-      latitude:
-        typeof arrival?.airport?.location?.lat === 'number' ? arrival.airport.location.lat : null,
-      longitude:
-        typeof arrival?.airport?.location?.lon === 'number' ? arrival.airport.location.lon : null,
-      timeZone: arrival?.airport?.timeZone ?? null,
-      terminal: arrival?.terminal ?? null,
-      gate: arrival?.gate ?? null,
-    },
+    flightNumber,
+    airlineName: stringAt(flight, ['airline', 'name']),
+    airlineIata: stringAt(flight, ['airline', 'iata']),
+    status: stringAt(flight, ['status']) ?? 'Unknown',
+    origin,
+    destination,
     departure: {
       scheduledUtc: depScheduledUtc,
       scheduledLocal: depScheduledLocal,
@@ -134,15 +146,12 @@ export function normalizeFlight(flight: any, index: number): FlightSearchResult 
       actualLocal: arrActualLocal,
     },
     durationMinutes,
-    distanceKm:
-      typeof flight?.greatCircleDistance?.km === 'number'
-        ? flight.greatCircleDistance.km
-        : null,
+    distanceKm: numberAt(flight, ['greatCircleDistance', 'km']),
     aircraft: {
-      model: flight?.aircraft?.model ?? null,
-      reg: flight?.aircraft?.reg ?? null,
+      model: stringAt(flight, ['aircraft', 'model']),
+      reg: stringAt(flight, ['aircraft', 'reg']),
     },
-    isCargo: Boolean(flight?.isCargo),
-    codeshareStatus: flight?.codeshareStatus ?? null,
+    isCargo: valueAt(flight, ['isCargo']) === true,
+    codeshareStatus: stringAt(flight, ['codeshareStatus']),
   };
 }

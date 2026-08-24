@@ -1,5 +1,4 @@
-import { useCallback, useState } from 'react';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import {
   ActivityIndicator,
   Platform,
@@ -13,65 +12,22 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { RouteMap } from '@/components/route-map';
 import { layout, palette, radius, spacing, type } from '@/constants/theme';
-import { getCachedFlights, loadFlights, type FlightRow } from '@/lib/flights';
+import { useFlightCollection } from '@/hooks/use-flight-collection';
 import { summarizeFlights } from '@/lib/insights';
-import { useAuth } from '@/providers/auth-provider';
 
 export default function FlightGlobeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { session, isLoading: isSessionLoading } = useAuth();
-  const [flights, setFlights] = useState<FlightRow[]>(
-    () => getCachedFlights(session?.user.id) ?? [],
-  );
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const refresh = useCallback(
-    async (showSpinner = false) => {
-      if (!session) {
-        setFlights([]);
-        return;
-      }
-      if (showSpinner) setIsRefreshing(true);
-      setMessage(null);
-      try {
-        setFlights(await loadFlights(session.user.id));
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Could not load your flight paths.');
-      } finally {
-        setIsRefreshing(false);
-      }
-    },
-    [session],
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh]),
-  );
+  const { error, flights, isInitialLoading, isRefreshing, refresh, session } =
+    useFlightCollection({ errorMessage: 'Could not load your flight paths.' });
 
   const insights = summarizeFlights(flights, null);
 
-  if (isSessionLoading) {
+  if (isInitialLoading || !session) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centered}>
           <ActivityIndicator color={palette.accent} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!session) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Sign in to see your flight paths</Text>
-          <Pressable onPress={() => router.replace('/profile')} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Go to sign in</Text>
-          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -109,9 +65,9 @@ export default function FlightGlobeScreen() {
           </Pressable>
         </View>
 
-        {message && (
+        {error && (
           <View style={[styles.errorBanner, { top: insets.top + 72 }]}>
-            <Text numberOfLines={1} style={styles.errorText}>{message}</Text>
+            <Text numberOfLines={1} style={styles.errorText}>{error}</Text>
             <Pressable onPress={() => void refresh()}>
               <Text style={styles.retryText}>Retry</Text>
             </Pressable>
@@ -162,13 +118,6 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: palette.background, flex: 1 },
   canvas: { backgroundColor: '#03070D', flex: 1, overflow: 'hidden' },
   centered: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  emptyState: {
-    flex: 1,
-    gap: spacing.lg,
-    justifyContent: 'center',
-    padding: layout.pagePadding,
-  },
-  emptyTitle: { color: palette.text, ...type.title },
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
