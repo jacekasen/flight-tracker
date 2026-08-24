@@ -50,7 +50,7 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}>
       <Tabs.Screen
-        name="index"
+        name="(flights)"
         options={{
           title: 'Flights',
           tabBarIcon: ({ color }) => <TabIcon symbol="✈" color={color} />,
@@ -62,10 +62,6 @@ export default function TabsLayout() {
           title: 'Add flight',
           tabBarIcon: ({ color }) => <TabIcon symbol="＋" color={color} />,
         }}
-      />
-      <Tabs.Screen
-        name="insights"
-        options={{ href: null }}
       />
       <Tabs.Screen
         name="profile"

@@ -4,6 +4,8 @@ export type FlightPreview = {
   dateLabel: string;
   origin: string;
   destination: string;
+  originCode: string;
+  destinationCode: string;
   departureTime: string;
   arrivalTime: string;
   status: string;

@@ -3,8 +3,30 @@ import type { FlightSearchResult } from '@/lib/flight-search';
 import type { Database } from '@/types/database';
 import type { FlightPreview } from '@/types/flight';
 
-export type FlightRow = Database['public']['Tables']['flights']['Row'];
+export type FlightRow = Database['public']['Tables']['flights']['Row'] & {
+  origin_city?: string | null;
+  destination_city?: string | null;
+};
 export type FlightInsert = Database['public']['Tables']['flights']['Insert'];
+
+const cachedFlightsByUser = new Map<string, FlightRow[]>();
+
+export function getCachedFlights(userId: string | null | undefined): FlightRow[] | null {
+  if (!userId) return null;
+  const cached = cachedFlightsByUser.get(userId);
+  return cached ? [...cached] : null;
+}
+
+function cacheFlight(flight: FlightRow): void {
+  const current = cachedFlightsByUser.get(flight.user_id);
+  if (!current) return;
+  cachedFlightsByUser.set(
+    flight.user_id,
+    [...current.filter((item) => item.id !== flight.id), flight].sort(
+      (left, right) => Date.parse(left.scheduled_departure) - Date.parse(right.scheduled_departure),
+    ),
+  );
+}
 
 export class FlightDataError extends Error {
   code: string;
@@ -105,10 +127,12 @@ export function searchResultToInsert(
 export async function saveFlight(insert: FlightInsert): Promise<FlightRow> {
   const { data, error } = await getSupabase().from('flights').insert(insert).select().single();
   if (error || !data) throwDataError(error);
-  return data;
+  const [flight] = await addAirportCities([data]);
+  cacheFlight(flight);
+  return flight;
 }
 
-export async function loadFlights(): Promise<FlightRow[]> {
+export async function loadFlights(userId?: string): Promise<FlightRow[]> {
   const pageSize = 1_000;
   const flights: FlightRow[] = [];
 
@@ -120,8 +144,12 @@ export async function loadFlights(): Promise<FlightRow[]> {
       .range(start, start + pageSize - 1);
     if (error) throw new FlightDataError('database_error', error.message);
     flights.push(...data);
-    if (data.length < pageSize) return flights;
+    if (data.length < pageSize) break;
   }
+
+  const enriched = await addAirportCities(flights);
+  if (userId) cachedFlightsByUser.set(userId, enriched);
+  return enriched;
 }
 
 export async function loadFlight(id: string): Promise<FlightRow> {
@@ -129,7 +157,28 @@ export async function loadFlight(id: string): Promise<FlightRow> {
   if (error || !data) {
     throw new FlightDataError('not_found', 'This flight could not be found.');
   }
-  return data;
+  const [flight] = await addAirportCities([data]);
+  return flight;
+}
+
+async function addAirportCities(flights: FlightRow[]): Promise<FlightRow[]> {
+  const airportCodes = [
+    ...new Set(flights.flatMap((flight) => [flight.origin_iata, flight.destination_iata])),
+  ];
+  if (!airportCodes.length) return flights;
+
+  const { data, error } = await getSupabase()
+    .from('airports')
+    .select('iata, municipality')
+    .in('iata', airportCodes);
+  if (error || !data) return flights;
+
+  const cities = new Map(data.map((airport) => [airport.iata, airport.municipality]));
+  return flights.map((flight) => ({
+    ...flight,
+    origin_city: cities.get(flight.origin_iata) ?? null,
+    destination_city: cities.get(flight.destination_iata) ?? null,
+  }));
 }
 
 export async function updateFlight(
@@ -143,12 +192,17 @@ export async function updateFlight(
     .select()
     .single();
   if (error || !data) throwDataError(error);
-  return data;
+  const [flight] = await addAirportCities([data]);
+  cacheFlight(flight);
+  return flight;
 }
 
 export async function deleteFlight(id: string): Promise<void> {
   const { error } = await getSupabase().from('flights').delete().eq('id', id);
   if (error) throw new FlightDataError('database_error', error.message);
+  for (const [userId, flights] of cachedFlightsByUser) {
+    cachedFlightsByUser.set(userId, flights.filter((flight) => flight.id !== id));
+  }
 }
 
 function safeFormat(date: string, options: Intl.DateTimeFormatOptions): string {
@@ -180,8 +234,10 @@ export function flightRowToPreview(flight: FlightRow): FlightPreview {
       day: 'numeric',
       timeZone: flight.origin_time_zone ?? undefined,
     }).toUpperCase(),
-    origin: flight.origin_iata,
-    destination: flight.destination_iata,
+    origin: flight.origin_city ?? flight.origin_iata,
+    destination: flight.destination_city ?? flight.destination_iata,
+    originCode: flight.origin_iata,
+    destinationCode: flight.destination_iata,
     departureTime: safeFormat(departure, {
       hour: 'numeric',
       minute: '2-digit',

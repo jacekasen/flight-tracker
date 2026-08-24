@@ -6,9 +6,11 @@ import type { FlightPreview } from '@/types/flight';
 export function FlightCard({
   flight,
   onPress,
+  compact = false,
 }: {
   flight: FlightPreview;
   onPress?: () => void;
+  compact?: boolean;
 }) {
   return (
     <Pressable
@@ -16,7 +18,11 @@ export function FlightCard({
       accessibilityRole={onPress ? 'button' : undefined}
       disabled={!onPress}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.card,
+        compact && styles.compactCard,
+        pressed && styles.pressed,
+      ]}
     >
       <View style={styles.topRow}>
         <View>
@@ -29,18 +35,26 @@ export function FlightCard({
       </View>
 
       <View style={styles.route}>
-        <View>
-          <Text style={styles.airport}>{flight.origin}</Text>
-          <Text style={styles.time}>{flight.departureTime}</Text>
+        <View style={styles.endpoint}>
+          <Text adjustsFontSizeToFit minimumFontScale={0.72} numberOfLines={1} style={styles.city}>
+            {flight.origin}
+          </Text>
+          <Text style={styles.airportMeta}>
+            {flight.originCode} · {flight.departureTime}
+          </Text>
         </View>
         <View style={styles.routeLine}>
           <View style={styles.line} />
           <Text style={styles.plane}>✈</Text>
           <View style={styles.line} />
         </View>
-        <View style={styles.destination}>
-          <Text style={styles.airport}>{flight.destination}</Text>
-          <Text style={styles.time}>{flight.arrivalTime}</Text>
+        <View style={[styles.endpoint, styles.destination]}>
+          <Text adjustsFontSizeToFit minimumFontScale={0.72} numberOfLines={1} style={styles.city}>
+            {flight.destination}
+          </Text>
+          <Text style={styles.airportMeta}>
+            {flight.destinationCode} · {flight.arrivalTime}
+          </Text>
         </View>
       </View>
 
@@ -61,19 +75,21 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.lg,
   },
+  compactCard: { borderRadius: 18, gap: 12, padding: spacing.md },
   pressed: { opacity: 0.72 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   date: { color: palette.muted, fontSize: 12, fontWeight: '600', marginBottom: 4 },
   number: { color: palette.text, fontSize: 16, fontWeight: '700' },
   statusBadge: { backgroundColor: palette.accentSoft, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   status: { color: palette.accent, fontSize: 11, fontWeight: '800' },
-  route: { flexDirection: 'row', alignItems: 'center' },
+  route: { alignItems: 'center', flexDirection: 'row' },
+  endpoint: { flex: 1 },
   destination: { alignItems: 'flex-end' },
-  airport: { color: palette.text, fontSize: 32, fontWeight: '800', letterSpacing: -1 },
-  time: { color: palette.muted, fontSize: 13, marginTop: 2 },
-  routeLine: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
+  city: { color: palette.text, fontSize: 17, fontWeight: '800', letterSpacing: -0.3, maxWidth: '100%' },
+  airportMeta: { color: palette.muted, fontSize: 12, fontWeight: '600', marginTop: 4 },
+  routeLine: { alignItems: 'center', flex: 0.34, flexDirection: 'row', paddingHorizontal: 6 },
   line: { flex: 1, height: 1, backgroundColor: palette.borderStrong },
-  plane: { color: palette.accent, fontSize: 16, marginHorizontal: 7 },
+  plane: { color: palette.accent, fontSize: 15, marginHorizontal: 5 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 14, borderTopColor: palette.border, borderTopWidth: 1 },
   detail: { color: palette.muted, fontSize: 12, fontWeight: '600' },
 });

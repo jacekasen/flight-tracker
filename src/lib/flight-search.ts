@@ -192,8 +192,14 @@ export function toFlightPreview(result: FlightSearchResult, fallbackDate: string
     id: result.id,
     flightNumber: result.flightNumber || 'Unknown flight',
     dateLabel: formatDateLabel(depLocal, fallbackDate),
-    origin: result.origin.iata ?? result.origin.icao ?? '???',
-    destination: result.destination.iata ?? result.destination.icao ?? '???',
+    origin: result.origin.municipality ?? result.origin.name ?? result.origin.iata ?? 'Unknown city',
+    destination:
+      result.destination.municipality ??
+      result.destination.name ??
+      result.destination.iata ??
+      'Unknown city',
+    originCode: result.origin.iata ?? result.origin.icao ?? '???',
+    destinationCode: result.destination.iata ?? result.destination.icao ?? '???',
     departureTime: formatLocalTime(depLocal),
     arrivalTime: formatLocalTime(arrLocal),
     status: formatStatus(result.status),

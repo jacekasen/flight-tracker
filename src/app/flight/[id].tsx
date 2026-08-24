@@ -6,10 +6,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,6 +39,7 @@ function formatDateTime(value: string, timeZone: string | null): string {
 
 export default function FlightDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { width } = useWindowDimensions();
   const { session, isLoading: isSessionLoading } = useAuth();
   const [flight, setFlight] = useState<FlightRow | null>(null);
   const [seat, setSeat] = useState('');
@@ -136,15 +137,16 @@ export default function FlightDetailScreen() {
         keyboardVerticalOffset={90}
         style={styles.flex}
       >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.content}>
           <View style={styles.headingRow}>
             <View>
               <Text style={styles.eyebrow}>{flight.is_manual ? 'MANUAL ENTRY' : 'SAVED FLIGHT'}</Text>
-              <Text style={styles.title}>Flight details</Text>
+              <View style={styles.titleRow}>
+                <Text style={styles.title}>Flight details</Text>
+                <Text style={styles.airline} numberOfLines={1}>
+                  {flight.airline_name ?? flight.airline_iata ?? 'Unknown airline'}
+                </Text>
+              </View>
             </View>
             {flight.is_manual && (
               <Pressable
@@ -161,97 +163,114 @@ export default function FlightDetailScreen() {
             )}
           </View>
 
-          <Text style={styles.airline}>
-            {flight.airline_name ?? flight.airline_iata ?? 'Unknown airline'}
-          </Text>
-          <FlightCard flight={flightRowToPreview(flight)} />
+          <FlightCard compact flight={flightRowToPreview(flight)} />
 
-          <View style={styles.detailsCard}>
-            <Detail
-              label="SCHEDULED DEPARTURE"
-              value={formatDateTime(flight.scheduled_departure, flight.origin_time_zone)}
-            />
-            <Detail
-              label="SCHEDULED ARRIVAL"
-              value={formatDateTime(flight.scheduled_arrival, flight.destination_time_zone)}
-            />
-            <Detail
-              label="DEPARTURE"
-              value={[
-                flight.departure_terminal && `Terminal ${flight.departure_terminal}`,
-                flight.departure_gate && `Gate ${flight.departure_gate}`,
-              ]
-                .filter(Boolean)
-                .join(' · ') || 'Terminal and gate unavailable'}
-            />
-            <Detail
-              label="ARRIVAL"
-              value={[
-                flight.arrival_terminal && `Terminal ${flight.arrival_terminal}`,
-                flight.arrival_gate && `Gate ${flight.arrival_gate}`,
-              ]
-                .filter(Boolean)
-                .join(' · ') || 'Terminal and gate unavailable'}
-            />
-            {flight.aircraft_registration && (
-              <Detail label="AIRCRAFT REGISTRATION" value={flight.aircraft_registration} />
-            )}
+          <View style={[styles.lowerGrid, width >= 760 && styles.lowerGridWide]}>
+            <View style={[styles.detailsCard, width >= 760 && styles.gridPanel]}>
+              <View style={styles.cardHeadingRow}>
+                <Text style={styles.sectionTitle}>Itinerary</Text>
+                <View style={styles.liveBadge}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>LOCAL TIMES</Text>
+                </View>
+              </View>
+              <View style={styles.detailGrid}>
+                <Detail
+                  label="DEPARTURE TIME"
+                  value={formatDateTime(flight.scheduled_departure, flight.origin_time_zone)}
+                />
+                <Detail
+                  label="ARRIVAL TIME"
+                  value={formatDateTime(flight.scheduled_arrival, flight.destination_time_zone)}
+                />
+                <Detail
+                  label="DEPARTURE"
+                  value={[
+                    flight.departure_terminal && `Terminal ${flight.departure_terminal}`,
+                    flight.departure_gate && `Gate ${flight.departure_gate}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || 'Terminal and gate unavailable'}
+                />
+                <Detail
+                  label="ARRIVAL"
+                  value={[
+                    flight.arrival_terminal && `Terminal ${flight.arrival_terminal}`,
+                    flight.arrival_gate && `Gate ${flight.arrival_gate}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || 'Terminal and gate unavailable'}
+                />
+                {flight.aircraft_registration && (
+                  <Detail label="AIRCRAFT" value={flight.aircraft_registration} />
+                )}
+              </View>
+            </View>
+
+            <View style={[styles.formCard, width >= 760 && styles.gridPanel]}>
+              <View style={styles.cardHeadingRow}>
+                <Text style={styles.sectionTitle}>Personal details</Text>
+                {message && (
+                  <Text style={message === 'Changes saved.' ? styles.success : styles.message}>
+                    {message}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.inputRow}>
+                <View style={styles.seatField}>
+                  <Text style={styles.label}>SEAT</Text>
+                  <TextInput
+                    accessibilityLabel="Seat"
+                    autoCapitalize="characters"
+                    onChangeText={setSeat}
+                    placeholder="—"
+                    placeholderTextColor={palette.muted}
+                    style={styles.input}
+                    value={seat}
+                  />
+                </View>
+                <View style={styles.notesField}>
+                  <Text style={styles.label}>NOTES</Text>
+                  <TextInput
+                    accessibilityLabel="Notes"
+                    onChangeText={setNotes}
+                    placeholder="Add a note"
+                    placeholderTextColor={palette.muted}
+                    style={styles.input}
+                    value={notes}
+                  />
+                </View>
+              </View>
+              <View style={styles.actionRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isSaving}
+                  onPress={savePersonalDetails}
+                  style={({ pressed }) => [
+                    styles.button,
+                    styles.saveButton,
+                    (pressed || isSaving) && styles.pressed,
+                  ]}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator color={palette.background} />
+                  ) : (
+                    <Text style={styles.buttonText}>Save changes</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isSaving}
+                  onPress={confirmDelete}
+                  style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.deleteText}>Delete flight</Text>
+                </Pressable>
+              </View>
+            </View>
           </View>
 
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Personal details</Text>
-            <Text style={styles.label}>SEAT</Text>
-            <TextInput
-              accessibilityLabel="Seat"
-              autoCapitalize="characters"
-              onChangeText={setSeat}
-              placeholder="Not added"
-              placeholderTextColor={palette.muted}
-              style={styles.input}
-              value={seat}
-            />
-            <Text style={styles.label}>NOTES</Text>
-            <TextInput
-              accessibilityLabel="Notes"
-              multiline
-              onChangeText={setNotes}
-              placeholder="No notes yet"
-              placeholderTextColor={palette.muted}
-              style={[styles.input, styles.notesInput]}
-              textAlignVertical="top"
-              value={notes}
-            />
-            <Pressable
-              accessibilityRole="button"
-              disabled={isSaving}
-              onPress={savePersonalDetails}
-              style={({ pressed }) => [
-                styles.button,
-                (pressed || isSaving) && styles.pressed,
-              ]}
-            >
-              {isSaving ? (
-                <ActivityIndicator color={palette.background} />
-              ) : (
-                <Text style={styles.buttonText}>Save personal details</Text>
-              )}
-            </Pressable>
-          </View>
-
-          {message && (
-            <Text style={message === 'Changes saved.' ? styles.success : styles.message}>
-              {message}
-            </Text>
-          )}
-          <Pressable
-            accessibilityRole="button"
-            disabled={isSaving}
-            onPress={confirmDelete}
-            style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.deleteText}>Delete flight</Text>
-          </Pressable>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -277,11 +296,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.lg,
   },
-  content: { gap: spacing.md, padding: spacing.lg, paddingBottom: 48 },
+  content: { flex: 1, gap: 12, padding: spacing.md },
   headingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   eyebrow: { color: palette.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1.4 },
-  title: { color: palette.text, fontSize: 29, fontWeight: '800' },
-  airline: { color: palette.muted, fontSize: 14 },
+  titleRow: { alignItems: 'baseline', flexDirection: 'row', gap: 10 },
+  title: { color: palette.text, fontSize: 25, fontWeight: '800', letterSpacing: -0.5 },
+  airline: { color: palette.muted, fontSize: 13, fontWeight: '600', maxWidth: 180 },
   editButton: {
     borderColor: palette.borderStrong,
     borderRadius: 10,
@@ -293,48 +313,63 @@ const styles = StyleSheet.create({
   detailsCard: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    gap: spacing.md,
-    padding: spacing.lg,
+    gap: 12,
+    padding: spacing.md,
   },
-  detail: { gap: 4 },
+  lowerGrid: { flex: 1, gap: 12, minHeight: 0 },
+  lowerGridWide: { flexDirection: 'row' },
+  gridPanel: { flex: 1 },
+  cardHeadingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  sectionTitle: { color: palette.text, fontSize: 16, fontWeight: '800' },
+  liveBadge: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  liveDot: { backgroundColor: palette.success, borderRadius: 3, height: 6, width: 6 },
+  liveText: { color: palette.muted, fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 12 },
+  detail: { gap: 3, minHeight: 39, width: '50%' },
   label: { color: palette.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
-  detailValue: { color: palette.text, fontSize: 14, lineHeight: 20 },
+  detailValue: { color: palette.text, fontSize: 13, lineHeight: 18, paddingRight: 8 },
   formCard: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    gap: 10,
-    padding: spacing.lg,
+    gap: 12,
+    padding: spacing.md,
   },
-  formTitle: { color: palette.text, fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  inputRow: { flexDirection: 'row', gap: 10 },
+  seatField: { gap: 5, width: 82 },
+  notesField: { flex: 1, gap: 5 },
   input: {
     borderColor: palette.borderStrong,
-    borderRadius: 13,
+    borderRadius: 11,
     borderWidth: 1,
     color: palette.text,
     fontSize: 15,
     paddingHorizontal: 14,
-    paddingVertical: 13,
+    height: 42,
+    paddingVertical: 10,
   },
-  notesInput: { minHeight: 100 },
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 'auto' },
   button: {
     alignItems: 'center',
     backgroundColor: palette.accent,
-    borderRadius: 14,
+    borderRadius: 12,
     justifyContent: 'center',
-    minHeight: 50,
+    minHeight: 42,
     paddingHorizontal: spacing.lg,
   },
+  saveButton: { flex: 1 },
   buttonText: { color: palette.background, fontSize: 15, fontWeight: '800' },
   deleteButton: {
     alignItems: 'center',
     borderColor: palette.warning,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    paddingVertical: 14,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: spacing.md,
   },
   deleteText: { color: palette.warning, fontSize: 14, fontWeight: '700' },
   message: { color: palette.warning, fontSize: 13 },

@@ -40,7 +40,7 @@ export default function InsightsScreen() {
       else setIsLoading(true);
       setMessage(null);
       try {
-        setFlights(await loadFlights());
+        setFlights(await loadFlights(session.user.id));
       } catch (error) {
         setMessage(error instanceof Error ? error.message : 'Could not load your insights.');
       } finally {
@@ -92,7 +92,7 @@ export default function InsightsScreen() {
           <EmptyState
             action="Sign in"
             body="Your route map and travel totals are private to your account."
-            onPress={() => router.push('/profile')}
+            onPress={() => router.back()}
             title="Sign in to see insights"
           />
         ) : message && flights.length === 0 ? (

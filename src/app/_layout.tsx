@@ -13,6 +13,8 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             contentStyle: { backgroundColor: palette.background },
+            gestureDirection: 'horizontal',
+            gestureEnabled: true,
             headerStyle: { backgroundColor: palette.background },
             headerTintColor: palette.text,
           }}
@@ -20,7 +22,10 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="confirm" options={{ title: 'Confirm flight' }} />
           <Stack.Screen name="manual" options={{ title: 'Manual entry' }} />
-          <Stack.Screen name="flight/[id]" options={{ title: 'Flight details' }} />
+          <Stack.Screen
+            name="flight/[id]"
+            options={{ headerBackButtonDisplayMode: 'minimal', title: 'Flight details' }}
+          />
         </Stack>
       </ThemeProvider>
     </AuthProvider>

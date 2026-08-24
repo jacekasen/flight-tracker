@@ -41,7 +41,7 @@ export async function buildAccountExport(): Promise<AccountExport> {
 
   const [{ data: profile, error: profileError }, flights] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
-    loadFlights(),
+    loadFlights(user.id),
   ]);
   if (profileError || !profile) {
     throw new AccountDataError('Could not load your profile for export.');

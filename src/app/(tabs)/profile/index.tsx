@@ -155,7 +155,7 @@ export default function ProfileScreen() {
                 <SettingsRow
                   body="Route map, totals, and yearly recaps"
                   icon="⌁"
-                  onPress={() => router.push('/insights')}
+                  onPress={() => router.push('/profile/insights')}
                   title="Flight insights"
                 />
               </View>
@@ -328,7 +328,7 @@ export default function ProfileScreen() {
                 <SettingsRow
                   body="Preview route maps, totals, and yearly recaps"
                   icon="⌁"
-                  onPress={() => router.push('/insights')}
+                  onPress={() => router.push('/profile/insights')}
                   title="Flight insights"
                 />
               </View>

@@ -13,7 +13,9 @@ export type RoutePoint = {
 export type InsightRoute = {
   id: string;
   origin: string;
+  originCity: string;
   destination: string;
+  destinationCity: string;
   originPoint: RoutePoint;
   destinationPoint: RoutePoint;
 };
@@ -117,7 +119,9 @@ export function summarizeFlights(flights: FlightRow[], year: number | null): Fli
       {
         id: flight.id,
         origin: flight.origin_iata,
+        originCity: flight.origin_city ?? flight.origin_iata,
         destination: flight.destination_iata,
+        destinationCity: flight.destination_city ?? flight.destination_iata,
         originPoint,
         destinationPoint,
       },

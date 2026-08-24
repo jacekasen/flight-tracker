@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import MapView, { Marker, Polyline } from 'react-native-maps';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { palette } from '@/constants/theme';
 import type { InsightRoute, RoutePoint } from '@/lib/insights';
@@ -32,21 +32,32 @@ function regionFor(points: RoutePoint[]) {
   };
 }
 
-export function RouteMap({ routes }: { routes: InsightRoute[] }) {
+export function RouteMap({
+  routes,
+  fullscreen = false,
+  globe = false,
+}: {
+  routes: InsightRoute[];
+  fullscreen?: boolean;
+  globe?: boolean;
+}) {
   const points = useMemo(
     () => routes.flatMap((route) => [route.originPoint, route.destinationPoint]),
     [routes],
   );
   const airports = useMemo(() => {
-    const unique = new Map<string, RoutePoint>();
+    const unique = new Map<string, { city: string; point: RoutePoint }>();
     for (const route of routes) {
-      unique.set(route.origin, route.originPoint);
-      unique.set(route.destination, route.destinationPoint);
+      unique.set(route.origin, { city: route.originCity, point: route.originPoint });
+      unique.set(route.destination, {
+        city: route.destinationCity,
+        point: route.destinationPoint,
+      });
     }
     return [...unique];
   }, [routes]);
 
-  if (!points.length) {
+  if (!points.length && !globe) {
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyTitle}>No routes to map yet</Text>
@@ -57,14 +68,27 @@ export function RouteMap({ routes }: { routes: InsightRoute[] }) {
     );
   }
 
+  const region = points.length
+    ? regionFor(points)
+    : { latitude: 20, longitude: 0, latitudeDelta: 150, longitudeDelta: 300 };
+  const globeCamera = {
+    altitude: 28_000_000,
+    center: { latitude: region.latitude, longitude: region.longitude },
+    heading: 0,
+    pitch: 0,
+    zoom: 1,
+  };
+
   return (
-    <View style={styles.frame}>
+    <View style={[styles.frame, fullscreen && styles.fullscreenFrame]}>
       <MapView
-        accessibilityLabel="Map of saved flight routes"
-        customMapStyle={darkMapStyle}
-        initialRegion={regionFor(points)}
-        pitchEnabled={false}
-        rotateEnabled={false}
+        accessibilityLabel={globe ? 'Globe of upcoming flight routes' : 'Map of saved flight routes'}
+        customMapStyle={globe ? undefined : darkMapStyle}
+        initialCamera={globe ? globeCamera : undefined}
+        initialRegion={globe ? undefined : region}
+        mapType={globe ? (Platform.OS === 'ios' ? 'hybridFlyover' : 'satellite') : 'standard'}
+        pitchEnabled={globe}
+        rotateEnabled={globe}
         style={styles.map}
       >
         {routes.map((route) => (
@@ -77,8 +101,12 @@ export function RouteMap({ routes }: { routes: InsightRoute[] }) {
             strokeWidth={2}
           />
         ))}
-        {airports.map(([iata, point]) => (
-          <Marker coordinate={point} key={iata} title={iata}>
+        {airports.map(([iata, airport]) => (
+          <Marker
+            coordinate={airport.point}
+            key={iata}
+            title={`${airport.city} (${iata})`}
+          >
             <View style={styles.marker}>
               <View style={styles.markerDot} />
             </View>
@@ -96,6 +124,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 280,
     overflow: 'hidden',
+  },
+  fullscreenFrame: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 0,
+    borderWidth: 0,
+    height: undefined,
   },
   map: { flex: 1 },
   marker: {
