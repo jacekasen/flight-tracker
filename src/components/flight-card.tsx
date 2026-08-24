@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { palette, spacing } from '@/constants/theme';
+import { layout, palette, radius, spacing, type } from '@/constants/theme';
 import type { FlightPreview } from '@/types/flight';
 
 export function FlightCard({
@@ -71,21 +71,21 @@ const styles = StyleSheet.create({
     backgroundColor: palette.surface,
     borderColor: palette.border,
     borderWidth: 1,
-    borderRadius: 22,
-    padding: spacing.lg,
+    borderRadius: radius.xl,
+    padding: layout.cardPadding,
     gap: spacing.lg,
   },
-  compactCard: { borderRadius: 18, gap: 12, padding: spacing.md },
+  compactCard: { borderRadius: radius.lg, gap: 12, padding: layout.cardPadding },
   pressed: { opacity: 0.72 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   date: { color: palette.muted, fontSize: 12, fontWeight: '600', marginBottom: 4 },
   number: { color: palette.text, fontSize: 16, fontWeight: '700' },
-  statusBadge: { backgroundColor: palette.accentSoft, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  statusBadge: { backgroundColor: palette.accentSoft, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
   status: { color: palette.accent, fontSize: 11, fontWeight: '800' },
   route: { alignItems: 'center', flexDirection: 'row' },
   endpoint: { flex: 1 },
   destination: { alignItems: 'flex-end' },
-  city: { color: palette.text, fontSize: 17, fontWeight: '800', letterSpacing: -0.3, maxWidth: '100%' },
+  city: { color: palette.text, maxWidth: '100%', ...type.title },
   airportMeta: { color: palette.muted, fontSize: 12, fontWeight: '600', marginTop: 4 },
   routeLine: { alignItems: 'center', flex: 0.34, flexDirection: 'row', paddingHorizontal: 6 },
   line: { flex: 1, height: 1, backgroundColor: palette.borderStrong },

@@ -2,13 +2,26 @@ import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { palette } from '@/constants/theme';
+import { palette, type } from '@/constants/theme';
 import { AuthProvider } from '@/providers/auth-provider';
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <ThemeProvider value={DarkTheme}>
+      <ThemeProvider
+        value={{
+          ...DarkTheme,
+          colors: {
+            ...DarkTheme.colors,
+            background: palette.background,
+            border: palette.border,
+            card: palette.surface,
+            notification: palette.danger,
+            primary: palette.accent,
+            text: palette.text,
+          },
+        }}
+      >
         <StatusBar style="light" />
         <Stack
           screenOptions={{
@@ -17,6 +30,7 @@ export default function RootLayout() {
             gestureEnabled: true,
             headerStyle: { backgroundColor: palette.background },
             headerTintColor: palette.text,
+            headerTitleStyle: { fontSize: type.bodyStrong.fontSize, fontWeight: '800' },
           }}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

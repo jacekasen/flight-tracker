@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { palette, spacing } from '@/constants/theme';
+import { layout, palette, radius, spacing, type } from '@/constants/theme';
 import {
   FlightDataError,
   loadFlight,
@@ -25,6 +25,7 @@ import {
   updateFlight,
   type FlightInsert,
 } from '@/lib/flights';
+import { normalizeFlightNumberInput } from '@/lib/flight-number';
 import { useAuth } from '@/providers/auth-provider';
 
 type FieldName = 'flightNumber' | 'airline' | 'origin' | 'destination' | 'time';
@@ -129,13 +130,13 @@ export default function ManualEntryScreen() {
 
   function buildInsert(): FlightInsert | null {
     const nextErrors: Errors = {};
-    const normalizedFlight = flightNumber.replace(/\s+/g, '').toUpperCase();
+    const normalizedFlight = normalizeFlightNumberInput(flightNumber);
     const normalizedOrigin = origin.trim().toUpperCase();
     const normalizedDestination = destination.trim().toUpperCase();
     const normalizedAirline = airline.trim();
 
-    if (!/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/.test(normalizedFlight)) {
-      nextErrors.flightNumber = 'Enter a valid flight number, such as UA120.';
+    if (!normalizedFlight) {
+      nextErrors.flightNumber = 'Enter a valid flight number, such as F9 1191.';
     }
     if (!normalizedAirline) nextErrors.airline = 'Airline is required.';
     if (!/^[A-Z]{3}$/.test(normalizedOrigin)) {
@@ -150,7 +151,7 @@ export default function ManualEntryScreen() {
     if (!session) setMessage('Sign in before saving a manual flight.');
 
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length || !session) return null;
+    if (Object.keys(nextErrors).length || !session || !normalizedFlight) return null;
 
     const looksLikeAirlineCode = /^[A-Z0-9]{2,3}$/.test(normalizedAirline.toUpperCase());
     const deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -347,22 +348,23 @@ function Field({
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   safeArea: { backgroundColor: palette.background, flex: 1 },
-  content: { gap: spacing.md, padding: spacing.lg, paddingBottom: 48 },
-  eyebrow: { color: palette.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  title: { color: palette.text, fontSize: 30, fontWeight: '800' },
-  helper: { color: palette.muted, fontSize: 13, lineHeight: 19 },
+  content: { gap: spacing.md, padding: layout.pagePadding, paddingBottom: layout.pageBottomPadding },
+  eyebrow: { color: palette.muted, ...type.eyebrow },
+  title: { color: palette.text, ...type.display },
+  helper: { color: palette.muted, ...type.body },
   form: { gap: 14, marginTop: spacing.sm },
   field: { gap: 7 },
-  label: { color: palette.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  label: { color: palette.muted, ...type.label },
   input: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 13,
+    borderRadius: radius.md,
     borderWidth: 1,
     color: palette.text,
-    fontSize: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    fontSize: type.button.fontSize,
+    minHeight: layout.controlHeight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
   },
   inputError: { borderColor: palette.warning },
   error: { color: palette.warning, fontSize: 12 },
@@ -371,7 +373,7 @@ const styles = StyleSheet.create({
   dateCard: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 15,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 7,
     padding: 14,
@@ -379,7 +381,7 @@ const styles = StyleSheet.create({
   pickerRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   dateButton: {
     borderColor: palette.borderStrong,
-    borderRadius: 10,
+    borderRadius: radius.sm,
     borderWidth: 1,
     flex: 1,
     padding: 12,
@@ -390,18 +392,18 @@ const styles = StyleSheet.create({
   primaryButton: {
     alignItems: 'center',
     backgroundColor: palette.accent,
-    borderRadius: 16,
+    borderRadius: radius.md,
     justifyContent: 'center',
-    minHeight: 54,
+    minHeight: layout.controlHeight,
   },
-  primaryText: { color: palette.background, fontSize: 16, fontWeight: '800' },
+  primaryText: { color: palette.background, ...type.button },
   secondaryButton: {
     alignItems: 'center',
     borderColor: palette.borderStrong,
-    borderRadius: 14,
+    borderRadius: radius.md,
     borderWidth: 1,
     paddingVertical: 14,
   },
-  secondaryText: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  secondaryText: { color: palette.text, ...type.bodyStrong },
   pressed: { opacity: 0.6 },
 });

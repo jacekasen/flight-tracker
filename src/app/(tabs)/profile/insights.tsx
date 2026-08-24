@@ -11,8 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { RouteMap } from '@/components/route-map';
-import { palette, spacing } from '@/constants/theme';
+import { layout, palette, radius, spacing, type } from '@/constants/theme';
 import { loadFlights, type FlightRow } from '@/lib/flights';
 import {
   availableInsightYears,
@@ -62,7 +61,9 @@ export default function InsightsScreen() {
     () => summarizeFlights(flights, selectedYear),
     [flights, selectedYear],
   );
-
+  const periodLabel = selectedYear == null ? 'ALL TIME' : `${selectedYear} RECAP`;
+  const airportLabel = `${insights.airports.length} ${insights.airports.length === 1 ? 'airport' : 'airports'}`;
+  const favoriteAirline = insights.airlines[0]?.label;
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <ScrollView
@@ -79,9 +80,16 @@ export default function InsightsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <View>
-            <Text style={styles.eyebrow}>YOUR STORY IN NUMBERS</Text>
-            <Text style={styles.title}>Insights</Text>
+          <View style={styles.headerIdentity}>
+            <Pressable
+              accessibilityLabel="Back to flight paths"
+              accessibilityRole="button"
+              onPress={() => router.back()}
+              style={styles.backButton}
+            >
+              <Text style={styles.backIcon}>‹</Text>
+            </Pressable>
+            <Text style={styles.title}>Recap</Text>
           </View>
           {selectedYear != null && <Text style={styles.recapBadge}>{selectedYear} RECAP</Text>}
         </View>
@@ -91,7 +99,7 @@ export default function InsightsScreen() {
         ) : !session ? (
           <EmptyState
             action="Sign in"
-            body="Your route map and travel totals are private to your account."
+            body="Sign in to view your route map and travel totals."
             onPress={() => router.back()}
             title="Sign in to see insights"
           />
@@ -112,6 +120,8 @@ export default function InsightsScreen() {
         ) : (
           <>
             {message && <Text style={styles.message}>{message}</Text>}
+
+            <Text style={styles.recapIntro}>Choose a chapter from your travel history.</Text>
             <ScrollView
               contentContainerStyle={styles.yearRow}
               horizontal
@@ -132,13 +142,36 @@ export default function InsightsScreen() {
               ))}
             </ScrollView>
 
-            <View style={styles.totalGrid}>
-              <TotalCard label="FLIGHTS" value={String(insights.totalFlights)} />
-              <TotalCard
-                label="DISTANCE"
-                value={`${insights.totalDistanceKm.toLocaleString()} km`}
-              />
-              <TotalCard label="TIME ALOFT" value={formatFlightTime(insights.totalDurationMinutes)} />
+            <View style={styles.recapHero}>
+              <View style={styles.heroGlow} />
+              <View style={styles.heroTopRow}>
+                <View>
+                  <Text style={styles.heroEyebrow}>{periodLabel}</Text>
+                  <Text style={styles.heroValue}>{insights.totalFlights}</Text>
+                  <Text style={styles.heroLabel}>FLIGHTS LOGGED</Text>
+                </View>
+                <View style={styles.heroIcon}>
+                  <Text style={styles.heroIconText}>✈</Text>
+                </View>
+              </View>
+
+              <Text style={styles.heroStory}>
+                You connected {airportLabel}
+                {favoriteAirline ? `, flying ${favoriteAirline} most often.` : '.'}
+              </Text>
+
+              <View style={styles.heroDivider} />
+              <View style={styles.heroStats}>
+                <HeroMetric
+                  label="DISTANCE"
+                  value={`${insights.totalDistanceKm.toLocaleString()} km`}
+                />
+                <View style={styles.metricDivider} />
+                <HeroMetric
+                  label="TIME ALOFT"
+                  value={formatFlightTime(insights.totalDurationMinutes)}
+                />
+              </View>
             </View>
             {insights.flightsWithDistance < insights.totalFlights && (
               <Text style={styles.coverage}>
@@ -146,12 +179,6 @@ export default function InsightsScreen() {
                 flights. Other totals still include every flight.
               </Text>
             )}
-
-            <SectionHeader
-              detail={`${insights.routes.length} mapped ${insights.routes.length === 1 ? 'route' : 'routes'}`}
-              title="Route map"
-            />
-            <RouteMap routes={insights.routes} />
 
             <SectionHeader detail="Most frequent" title="Highlights" />
             <View style={styles.summaryGrid}>
@@ -188,13 +215,13 @@ function YearChip({
   );
 }
 
-function TotalCard({ label, value }: { label: string; value: string }) {
+function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.totalCard}>
-      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.totalValue}>
+    <View style={styles.heroMetric}>
+      <Text adjustsFontSizeToFit numberOfLines={1} style={styles.metricValue}>
         {value}
       </Text>
-      <Text style={styles.totalLabel}>{label}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
     </View>
   );
 }
@@ -226,8 +253,9 @@ function RankingCard({
       {items.length ? (
         items.slice(0, 5).map((item, index) => (
           <View key={item.label} style={styles.rankingRow}>
+            <Text style={styles.rankingIndex}>{String(index + 1).padStart(2, '0')}</Text>
             <Text numberOfLines={1} style={styles.rankingLabel}>
-              {index + 1}. {item.label}
+              {item.label}
             </Text>
             <Text style={styles.rankingCount}>{item.count}</Text>
           </View>
@@ -263,18 +291,29 @@ function EmptyState({
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: palette.background, flex: 1 },
-  content: { gap: spacing.md, padding: spacing.lg, paddingBottom: 120 },
+  content: { gap: spacing.md, padding: layout.pagePadding, paddingBottom: layout.pageBottomPadding },
   header: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
-  eyebrow: { color: palette.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  title: { color: palette.text, fontSize: 36, fontWeight: '800', letterSpacing: -1.4 },
+  headerIdentity: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  backButton: {
+    alignItems: 'center',
+    backgroundColor: palette.surface,
+    borderColor: palette.border,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  backIcon: { color: palette.text, fontSize: 30, lineHeight: 31 },
+  title: { color: palette.text, ...type.display },
   recapBadge: {
     backgroundColor: palette.accentSoft,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     color: palette.accent,
     fontSize: 10,
     fontWeight: '800',
@@ -283,10 +322,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
+  recapIntro: { color: palette.muted, marginBottom: spacing.sm, ...type.body },
   yearRow: { gap: spacing.sm, paddingVertical: spacing.sm },
   yearChip: {
     borderColor: palette.borderStrong,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     borderWidth: 1,
     minHeight: 44,
     paddingHorizontal: 16,
@@ -295,19 +335,71 @@ const styles = StyleSheet.create({
   yearChipActive: { backgroundColor: palette.accent, borderColor: palette.accent },
   yearText: { color: palette.muted, fontSize: 13, fontWeight: '700' },
   yearTextActive: { color: palette.background },
-  totalGrid: { flexDirection: 'row', gap: spacing.sm },
-  totalCard: {
-    backgroundColor: palette.surface,
-    borderColor: palette.border,
-    borderRadius: 18,
+  recapHero: {
+    backgroundColor: '#0B1C2E',
+    borderColor: 'rgba(77, 163, 255, 0.35)',
+    borderRadius: radius.xl,
     borderWidth: 1,
-    flex: 1,
-    minHeight: 105,
-    padding: 13,
-    justifyContent: 'center',
+    overflow: 'hidden',
+    padding: spacing.lg,
+    position: 'relative',
   },
-  totalValue: { color: palette.text, fontSize: 21, fontWeight: '800', letterSpacing: -0.5 },
-  totalLabel: {
+  heroGlow: {
+    backgroundColor: palette.accent,
+    borderRadius: 120,
+    height: 210,
+    opacity: 0.1,
+    position: 'absolute',
+    right: -70,
+    top: -90,
+    width: 210,
+  },
+  heroTopRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  heroEyebrow: { color: palette.accent, ...type.label },
+  heroValue: {
+    color: palette.text,
+    fontSize: 58,
+    fontWeight: '800',
+    letterSpacing: -2.5,
+    lineHeight: 64,
+    marginTop: 3,
+  },
+  heroLabel: { color: '#B7C6D6', ...type.label },
+  heroIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(77, 163, 255, 0.15)',
+    borderColor: 'rgba(77, 163, 255, 0.32)',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  heroIconText: { color: palette.accent, fontSize: 23 },
+  heroStory: {
+    color: '#D6E0EA',
+    marginTop: spacing.lg,
+    maxWidth: 330,
+    ...type.body,
+  },
+  heroDivider: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    height: StyleSheet.hairlineWidth,
+    marginVertical: spacing.lg,
+  },
+  heroStats: { flexDirection: 'row' },
+  heroMetric: { flex: 1 },
+  metricDivider: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal: spacing.md,
+    width: StyleSheet.hairlineWidth,
+  },
+  metricValue: { color: palette.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+  metricLabel: {
     color: palette.muted,
     fontSize: 9,
     fontWeight: '800',
@@ -321,13 +413,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.lg,
   },
-  sectionTitle: { color: palette.text, fontSize: 20, fontWeight: '800' },
+  sectionTitle: { color: palette.text, ...type.title },
   sectionDetail: { color: palette.muted, fontSize: 11 },
   summaryGrid: { gap: spacing.sm },
   rankingCard: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 18,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: spacing.md,
   },
@@ -343,28 +435,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 38,
   },
+  rankingIndex: { color: palette.accent, fontSize: 11, fontWeight: '800', width: 24 },
   rankingLabel: { color: palette.text, flex: 1, fontSize: 13 },
   rankingCount: { color: palette.muted, fontSize: 12, fontWeight: '700' },
   unavailable: { color: palette.muted, fontSize: 13, fontStyle: 'italic' },
   message: { color: palette.warning, fontSize: 13 },
   emptyCard: {
     borderColor: palette.border,
-    borderRadius: 20,
+    borderRadius: radius.lg,
     borderStyle: 'dashed',
     borderWidth: 1,
     marginTop: spacing.lg,
     padding: spacing.lg,
   },
-  emptyTitle: { color: palette.text, fontSize: 18, fontWeight: '800' },
-  emptyBody: { color: palette.muted, fontSize: 14, lineHeight: 20, marginTop: spacing.sm },
+  emptyTitle: { color: palette.text, ...type.title },
+  emptyBody: { color: palette.muted, marginTop: spacing.sm, ...type.body },
   emptyButton: {
     alignItems: 'center',
     borderColor: palette.borderStrong,
-    borderRadius: 13,
+    borderRadius: radius.md,
     borderWidth: 1,
     marginTop: spacing.md,
     minHeight: 44,
     justifyContent: 'center',
   },
-  emptyButtonText: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  emptyButtonText: { color: palette.text, ...type.bodyStrong },
 });

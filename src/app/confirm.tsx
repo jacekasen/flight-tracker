@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FlightCard } from '@/components/flight-card';
-import { palette, spacing } from '@/constants/theme';
+import { layout, palette, radius, spacing, type } from '@/constants/theme';
 import { toFlightPreview, type FlightSearchResult } from '@/lib/flight-search';
 import { FlightDataError, saveFlight, searchResultToInsert } from '@/lib/flights';
 import { useAuth } from '@/providers/auth-provider';
@@ -177,60 +177,61 @@ export default function ConfirmFlightScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   safeArea: { backgroundColor: palette.background, flex: 1 },
-  content: { gap: spacing.md, padding: spacing.lg, paddingBottom: 48 },
+  content: { gap: spacing.md, padding: layout.pagePadding, paddingBottom: layout.pageBottomPadding },
   centered: { flex: 1, gap: spacing.lg, justifyContent: 'center', padding: spacing.lg },
-  eyebrow: { color: palette.muted, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  title: { color: palette.text, fontSize: 30, fontWeight: '800' },
-  airline: { color: palette.muted, fontSize: 14, marginTop: -8 },
+  eyebrow: { color: palette.muted, ...type.eyebrow },
+  title: { color: palette.text, ...type.display },
+  airline: { color: palette.muted, marginTop: -8, ...type.body },
   scheduleCard: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.md,
-    padding: spacing.md,
+    padding: layout.cardPadding,
   },
   scheduleColumn: { flex: 1, gap: 5 },
   scheduleValue: { color: palette.text, fontSize: 13, fontWeight: '600', lineHeight: 18 },
   formCard: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 20,
+    borderRadius: radius.lg,
     borderWidth: 1,
     gap: 10,
     marginTop: spacing.sm,
     padding: spacing.lg,
   },
-  formTitle: { color: palette.text, fontSize: 18, fontWeight: '800', marginBottom: 4 },
-  label: { color: palette.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  formTitle: { color: palette.text, marginBottom: 4, ...type.title },
+  label: { color: palette.muted, ...type.label },
   input: {
     borderColor: palette.borderStrong,
-    borderRadius: 13,
+    borderRadius: radius.md,
     borderWidth: 1,
     color: palette.text,
-    fontSize: 15,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    fontSize: type.button.fontSize,
+    minHeight: layout.controlHeight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
   },
   notesInput: { minHeight: 100 },
   message: { color: palette.warning, fontSize: 13, lineHeight: 19 },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: palette.accent,
-    borderRadius: 16,
+    borderRadius: radius.md,
     justifyContent: 'center',
-    minHeight: 54,
+    minHeight: layout.controlHeight,
   },
-  primaryText: { color: palette.background, fontSize: 16, fontWeight: '800' },
+  primaryText: { color: palette.background, ...type.button },
   secondaryButton: {
     alignItems: 'center',
     borderColor: palette.borderStrong,
-    borderRadius: 14,
+    borderRadius: radius.md,
     borderWidth: 1,
     paddingVertical: 14,
   },
-  secondaryText: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  secondaryText: { color: palette.text, ...type.bodyStrong },
   pressed: { opacity: 0.6 },
   errorTitle: { color: palette.text, fontSize: 22, fontWeight: '800' },
 });

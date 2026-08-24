@@ -13,11 +13,13 @@ describe('flight search validation', () => {
     ['ua120', 'UA120'],
     ['KL 1395', 'KL1395'],
     ['3U8633', '3U8633'],
+    ['R3 501', 'R3501'],
+    ['F9 1191', 'F91191'],
   ])('normalizes %s', (input, expected) => {
     expect(normalizeFlightNumber(input)).toBe(expected);
   });
 
-  it.each(['UA', '120', 'UNITED120', 'UA12-0', ''])('rejects %s', (input) => {
+  it.each(['UA', '120', '1234', 'UNITED120', 'UA12-0', ''])('rejects %s', (input) => {
     expect(normalizeFlightNumber(input)).toBeNull();
   });
 

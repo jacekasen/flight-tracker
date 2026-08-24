@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Text, View, type ColorValue } from 'react-native';
 
-import { palette } from '@/constants/theme';
+import { palette, type } from '@/constants/theme';
 
 function TabIcon({ symbol, color }: { symbol: string; color: ColorValue }) {
   return <Text style={{ color, fontSize: 20 }}>{symbol}</Text>;
@@ -47,7 +47,7 @@ export default function TabsLayout() {
           height: 86,
           paddingTop: 8,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: type.caption.fontSize, fontWeight: '700' },
       }}>
       <Tabs.Screen
         name="(flights)"

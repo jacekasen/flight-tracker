@@ -1,20 +1,68 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { palette, spacing } from '@/constants/theme';
-import type { InsightRoute } from '@/lib/insights';
+import { palette, radius, spacing, type } from '@/constants/theme';
+import type { InsightRoute, RoutePoint } from '@/lib/insights';
+
+const GLOBE_SIZE = 290;
+const GLOBE_CENTER = GLOBE_SIZE / 2;
+const GLOBE_RADIUS = 124;
+
+function projectToGlobe(point: RoutePoint) {
+  const latitudeRadians = (point.latitude * Math.PI) / 180;
+  return {
+    x:
+      GLOBE_CENTER +
+      (point.longitude / 180) * GLOBE_RADIUS * Math.cos(latitudeRadians),
+    y: GLOBE_CENTER - (point.latitude / 90) * GLOBE_RADIUS,
+  };
+}
+
+function RoutePath({ route }: { route: InsightRoute }) {
+  const origin = projectToGlobe(route.originPoint);
+  const destination = projectToGlobe(route.destinationPoint);
+  const deltaX = destination.x - origin.x;
+  const deltaY = destination.y - origin.y;
+  const length = Math.sqrt(deltaX ** 2 + deltaY ** 2);
+  const angle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
+
+  return (
+    <View
+      style={[
+        styles.routePath,
+        {
+          left: (origin.x + destination.x - length) / 2,
+          top: (origin.y + destination.y) / 2,
+          transform: [{ rotate: `${angle}deg` }],
+          width: length,
+        },
+      ]}
+    />
+  );
+}
 
 export function RouteMap({
   routes,
   fullscreen = false,
   globe = false,
+  hero = false,
 }: {
   routes: InsightRoute[];
   fullscreen?: boolean;
   globe?: boolean;
+  hero?: boolean;
 }) {
   if (globe) {
+    const airports = new Map<string, RoutePoint>();
+    for (const route of routes) {
+      airports.set(route.origin, route.originPoint);
+      airports.set(route.destination, route.destinationPoint);
+    }
+
     return (
-      <View style={[styles.globeBackdrop, fullscreen && styles.fullscreen]}>
+      <View
+        accessibilityLabel={`Globe showing ${routes.length} saved flight ${routes.length === 1 ? 'path' : 'paths'}`}
+        style={[styles.globeBackdrop, hero && styles.heroBackdrop, fullscreen && styles.fullscreen]}
+      >
         <View style={styles.glow} />
         <View style={styles.globe}>
           <View style={[styles.globeLine, styles.equator]} />
@@ -22,13 +70,16 @@ export function RouteMap({
           <View style={[styles.globeLine, styles.latitudeSouth]} />
           <View style={[styles.globeLine, styles.meridian]} />
           <View style={[styles.globeLine, styles.meridianTilted]} />
-          {routes.length > 0 && (
-            <>
-              <View style={styles.routeArc} />
-              <View style={[styles.routePoint, styles.routePointOrigin]} />
-              <View style={[styles.routePoint, styles.routePointDestination]} />
-            </>
-          )}
+          {routes.map((route) => <RoutePath key={route.id} route={route} />)}
+          {[...airports].map(([iata, point]) => {
+            const projected = projectToGlobe(point);
+            return (
+              <View
+                key={iata}
+                style={[styles.routePoint, { left: projected.x - 3, top: projected.y - 3 }]}
+              />
+            );
+          })}
         </View>
       </View>
     );
@@ -52,6 +103,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
+  heroBackdrop: { minHeight: 380 },
   glow: {
     backgroundColor: '#0B3157',
     borderRadius: 210,
@@ -90,38 +142,32 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '34deg' }],
     width: 86,
   },
-  routeArc: {
-    borderColor: palette.accent,
-    borderRadius: 90,
-    borderTopWidth: 2,
-    height: 80,
-    left: 64,
+  routePath: {
+    backgroundColor: palette.accent,
+    borderRadius: 2,
+    height: 1.5,
+    opacity: 0.72,
     position: 'absolute',
-    top: 83,
-    transform: [{ rotate: '-12deg' }],
-    width: 164,
   },
   routePoint: {
     backgroundColor: palette.accent,
     borderColor: '#CBE5FF',
-    borderRadius: 5,
-    borderWidth: 2,
-    height: 10,
+    borderRadius: 3,
+    borderWidth: 1,
+    height: 6,
     position: 'absolute',
-    width: 10,
+    width: 6,
   },
-  routePointOrigin: { left: 64, top: 145 },
-  routePointDestination: { right: 57, top: 108 },
   fallback: {
     alignItems: 'center',
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 20,
+    borderRadius: radius.lg,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 220,
     padding: spacing.lg,
   },
-  title: { color: palette.text, fontSize: 15, fontWeight: '700', textAlign: 'center' },
-  body: { color: palette.muted, fontSize: 13, marginTop: spacing.sm, textAlign: 'center' },
+  title: { color: palette.text, textAlign: 'center', ...type.title },
+  body: { color: palette.muted, marginTop: spacing.sm, textAlign: 'center', ...type.body },
 });

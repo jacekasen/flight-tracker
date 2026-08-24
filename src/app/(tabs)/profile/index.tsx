@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { palette, spacing } from '@/constants/theme';
+import { layout, palette, radius, spacing, type } from '@/constants/theme';
 import { deleteAccount, exportAccountData } from '@/lib/account';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
@@ -82,7 +82,7 @@ export default function ProfileScreen() {
     setMessage(null);
     try {
       await exportAccountData();
-      setMessage('Your private flight data export is ready.');
+      setMessage('Your flight data export is ready.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not export your data.');
     } finally {
@@ -113,7 +113,6 @@ export default function ProfileScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.eyebrow}>ACCOUNT</Text>
           <Text style={styles.title}>Profile</Text>
 
           {!isSupabaseConfigured ? (
@@ -143,10 +142,6 @@ export default function ProfileScreen() {
                     {session.user.user_metadata.full_name ?? 'Flight tracker'}
                   </Text>
                   <Text style={styles.accountEmail}>{session.user.email}</Text>
-                  <View style={styles.privateBadge}>
-                    <View style={styles.privateDot} />
-                    <Text style={styles.privateBadgeText}>Private account</Text>
-                  </View>
                 </View>
               </View>
 
@@ -155,12 +150,12 @@ export default function ProfileScreen() {
                 <SettingsRow
                   body="Route map, totals, and yearly recaps"
                   icon="⌁"
-                  onPress={() => router.push('/profile/insights')}
+                  onPress={() => router.push('/profile/globe')}
                   title="Flight insights"
                 />
               </View>
 
-              <Text style={styles.groupLabel}>PRIVACY & DATA</Text>
+              <Text style={styles.groupLabel}>YOUR DATA</Text>
               <View style={styles.settingsGroup}>
                 <SettingsRow
                   body="Download your complete flight history"
@@ -170,18 +165,6 @@ export default function ProfileScreen() {
                   onPress={handleExport}
                   title="Export flight data"
                 />
-                <View style={styles.rowDivider} />
-                <View style={styles.infoRow}>
-                  <View style={[styles.rowIcon, styles.secureIcon]}>
-                    <Text style={styles.secureIconText}>✓</Text>
-                  </View>
-                  <View style={styles.rowCopy}>
-                    <Text style={styles.rowTitle}>Private by default</Text>
-                    <Text style={styles.rowBody}>
-                      Your flights are protected by row-level security.
-                    </Text>
-                  </View>
-                </View>
               </View>
 
               <View style={styles.settingsGroup}>
@@ -321,14 +304,14 @@ export default function ProfileScreen() {
                   </Text>
                 )}
               </Pressable>
-              <Text style={styles.privacy}>
-                Sign in to save, edit, and revisit your private flight history.
+              <Text style={styles.accountHelper}>
+                Sign in to save, edit, and revisit your flight history.
               </Text>
               <View style={styles.settingsGroup}>
                 <SettingsRow
                   body="Preview route maps, totals, and yearly recaps"
                   icon="⌁"
-                  onPress={() => router.push('/profile/insights')}
+                  onPress={() => router.push('/profile/globe')}
                   title="Flight insights"
                 />
               </View>
@@ -385,14 +368,17 @@ function SettingsRow({
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   safeArea: { flex: 1, backgroundColor: palette.background },
-  content: { paddingHorizontal: 20, paddingTop: spacing.md, paddingBottom: 96 },
-  eyebrow: { color: palette.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
-  title: { color: palette.text, fontSize: 30, fontWeight: '800', marginBottom: spacing.md },
+  content: {
+    paddingBottom: layout.pageBottomPadding,
+    paddingHorizontal: layout.mainTabHorizontal,
+    paddingTop: layout.mainTabHeaderTop,
+  },
+  title: { color: palette.text, marginBottom: spacing.md, ...type.display },
   card: {
     alignItems: 'flex-start',
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
@@ -407,13 +393,13 @@ const styles = StyleSheet.create({
   },
   statusCopy: { flex: 1 },
   statusTitle: { color: palette.text, fontSize: 16, fontWeight: '700', marginBottom: 5 },
-  statusBody: { color: palette.muted, fontSize: 13, lineHeight: 19 },
+  statusBody: { color: palette.muted, ...type.body },
   sessionContent: { gap: 8 },
   profileHero: {
     alignItems: 'center',
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 18,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     minHeight: 90,
@@ -432,18 +418,6 @@ const styles = StyleSheet.create({
   profileCopy: { alignItems: 'flex-start', flex: 1 },
   accountName: { color: palette.text, fontSize: 19, fontWeight: '800' },
   accountEmail: { color: palette.muted, fontSize: 12, marginTop: 2 },
-  privateBadge: {
-    alignItems: 'center',
-    backgroundColor: palette.successSoft,
-    borderRadius: 999,
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  privateDot: { backgroundColor: palette.success, borderRadius: 3, height: 6, width: 6 },
-  privateBadgeText: { color: palette.success, fontSize: 11, fontWeight: '700' },
   groupLabel: {
     color: palette.muted,
     fontSize: 10,
@@ -456,7 +430,7 @@ const styles = StyleSheet.create({
   settingsGroup: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -468,18 +442,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 9,
   },
-  infoRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 12,
-    minHeight: 58,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 9,
-  },
   rowIcon: {
     alignItems: 'center',
     backgroundColor: palette.accentSoft,
-    borderRadius: 10,
+    borderRadius: radius.sm,
     height: 34,
     justifyContent: 'center',
     width: 34,
@@ -489,13 +455,10 @@ const styles = StyleSheet.create({
   rowTitle: { color: palette.text, fontSize: 15, fontWeight: '700' },
   rowBody: { color: palette.muted, fontSize: 11, lineHeight: 15, marginTop: 2 },
   chevron: { color: palette.muted, fontSize: 24, lineHeight: 26 },
-  rowDivider: { backgroundColor: palette.border, height: StyleSheet.hairlineWidth, marginLeft: 62 },
-  secureIcon: { backgroundColor: palette.successSoft },
-  secureIconText: { color: palette.success, fontSize: 17, fontWeight: '900' },
   dangerGroup: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -510,7 +473,7 @@ const styles = StyleSheet.create({
   deleteIcon: { backgroundColor: palette.dangerSoft },
   deleteIconText: { color: palette.danger, fontSize: 24, fontWeight: '500', lineHeight: 25 },
   deleteRowTitle: { color: palette.danger, fontSize: 15, fontWeight: '700' },
-  controlCopy: { color: palette.muted, fontSize: 13, lineHeight: 19 },
+  controlCopy: { color: palette.muted, ...type.body },
   confirmation: {
     gap: 12,
     padding: spacing.md,
@@ -520,61 +483,62 @@ const styles = StyleSheet.create({
   cancelButton: {
     alignItems: 'center',
     borderColor: palette.borderStrong,
-    borderRadius: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
-    minHeight: 46,
+    minHeight: layout.controlHeight,
   },
   cancelButtonText: { color: palette.text, fontSize: 14, fontWeight: '700' },
   deleteButton: {
     alignItems: 'center',
     backgroundColor: palette.danger,
-    borderRadius: 12,
+    borderRadius: radius.md,
     flex: 1.4,
     justifyContent: 'center',
-    minHeight: 46,
+    minHeight: layout.controlHeight,
   },
   deleteButtonText: { color: palette.background, fontSize: 13, fontWeight: '800' },
   form: { gap: 12 },
   modeRow: {
     backgroundColor: palette.surface,
-    borderRadius: 14,
+    borderRadius: radius.md,
     flexDirection: 'row',
     padding: 4,
   },
-  modeButton: { alignItems: 'center', borderRadius: 11, flex: 1, paddingVertical: 11 },
+  modeButton: { alignItems: 'center', borderRadius: radius.sm, flex: 1, paddingVertical: 11 },
   modeButtonActive: { backgroundColor: palette.accentSoft },
   modeText: { color: palette.muted, fontSize: 13, fontWeight: '700' },
   modeTextActive: { color: palette.accent },
   input: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 14,
+    borderRadius: radius.md,
     borderWidth: 1,
     color: palette.text,
     fontSize: 16,
     paddingHorizontal: 16,
-    paddingVertical: 15,
+    minHeight: layout.controlHeight,
+    paddingVertical: 12,
   },
   message: { color: palette.warning, fontSize: 13, lineHeight: 19 },
   primaryButton: {
     alignItems: 'center',
     backgroundColor: palette.accent,
-    borderRadius: 16,
+    borderRadius: radius.md,
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: layout.controlHeight,
   },
-  primaryButtonText: { color: palette.background, fontSize: 16, fontWeight: '800' },
+  primaryButtonText: { color: palette.background, ...type.button },
   secondaryButton: {
     alignItems: 'center',
     borderColor: palette.borderStrong,
-    borderRadius: 14,
+    borderRadius: radius.md,
     borderWidth: 1,
     paddingVertical: 14,
     width: '100%',
   },
-  secondaryButtonText: { color: palette.text, fontSize: 15, fontWeight: '700' },
+  secondaryButtonText: { color: palette.text, ...type.bodyStrong },
   pressed: { opacity: 0.65 },
-  privacy: { color: palette.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  accountHelper: { color: palette.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
 });

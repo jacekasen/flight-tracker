@@ -37,10 +37,10 @@ type FlightTimes = {
 
 export function normalizeFlightNumber(raw: string): string | null {
   const compact = raw.replace(/\s+/g, '').toUpperCase();
-  if (!/^(?:[A-Z][A-Z0-9]|[A-Z0-9][A-Z]|[A-Z]{3})\d{1,4}[A-Z]?$/.test(compact)) {
-    return null;
-  }
-  return compact;
+  const match = compact.match(/^([A-Z0-9]{2}|[A-Z]{3})(\d{1,4}[A-Z]?)$/);
+
+  if (!match || !/[A-Z]/.test(match[1])) return null;
+  return `${match[1]}${match[2]}`;
 }
 
 export function isValidDate(raw: string): boolean {

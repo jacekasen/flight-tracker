@@ -18,13 +18,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FlightCard } from '@/components/flight-card';
-import { palette, spacing } from '@/constants/theme';
+import { layout, palette, radius, spacing, type } from '@/constants/theme';
 import {
   FlightSearchError,
   searchFlights,
   toFlightPreview,
   type FlightSearchResult,
 } from '@/lib/flight-search';
+import { normalizeFlightNumberInput } from '@/lib/flight-number';
 import { useAuth } from '@/providers/auth-provider';
 
 function toIsoDate(date: Date): string {
@@ -63,9 +64,9 @@ export default function SearchScreen() {
 
   function handleContinue() {
     Keyboard.dismiss();
-    const normalized = flightNumber.replace(/\s+/g, '').toUpperCase();
-    if (!/^(?:[A-Z][A-Z0-9]|[A-Z0-9][A-Z]|[A-Z]{3})\d{1,4}[A-Z]?$/.test(normalized)) {
-      setState({ kind: 'error', message: 'Enter a valid flight number, such as UA 120.' });
+    const normalized = normalizeFlightNumberInput(flightNumber);
+    if (!normalized) {
+      setState({ kind: 'error', message: 'Enter a valid flight number, such as F9 1191.' });
       return;
     }
 
@@ -123,8 +124,10 @@ export default function SearchScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.eyebrow}>TRACK SOMETHING NEW</Text>
-        <Text style={styles.title}>Add a flight</Text>
+        <View style={styles.header}>
+          <Text style={styles.title}>Add a flight</Text>
+          <Text style={styles.subtitle}>Find your itinerary by flight number and departure date.</Text>
+        </View>
 
         {isSessionLoading ? (
           <ActivityIndicator color={palette.accent} />
@@ -132,7 +135,7 @@ export default function SearchScreen() {
           <View style={styles.messageCard}>
             <Text style={styles.messageTitle}>Sign in to add flights</Text>
             <Text style={styles.messageBody}>
-              Your searches and saved history are tied to your private account.
+              Your searches and saved history are tied to your account.
             </Text>
             <Pressable
               accessibilityRole="button"
@@ -144,139 +147,138 @@ export default function SearchScreen() {
           </View>
         ) : (
           <>
+            <View style={styles.searchCard}>
+              {step === 'flight' ? (
+                <>
+                  <Text style={styles.stepLabel}>STEP 1 OF 2 · FLIGHT NUMBER</Text>
+                  <View style={styles.searchBox}>
+                    <Text style={styles.searchIcon}>✈</Text>
+                    <TextInput
+                      accessibilityLabel="Flight number"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      autoFocus
+                      onChangeText={setFlightNumber}
+                      onSubmitEditing={handleContinue}
+                      placeholder="Flight number, e.g. F9 1191"
+                      placeholderTextColor={palette.muted}
+                      returnKeyType="next"
+                      style={styles.input}
+                      value={flightNumber}
+                    />
+                  </View>
 
-        {step === 'flight' ? (
-          <>
-            <Text style={styles.stepLabel}>1 · FLIGHT NUMBER</Text>
-            <View style={styles.searchBox}>
-              <Text style={styles.searchIcon}>⌕</Text>
-              <TextInput
-                accessibilityLabel="Flight number"
-                autoCapitalize="characters"
-                autoCorrect={false}
-                autoFocus
-                onChangeText={setFlightNumber}
-                onSubmitEditing={handleContinue}
-                placeholder="Flight number, e.g. UA 120"
-                placeholderTextColor={palette.muted}
-                returnKeyType="next"
-                style={styles.input}
-                value={flightNumber}
-              />
-            </View>
+                  <Text style={styles.hint}>
+                    Use the airline code and flight number shown on your ticket.
+                  </Text>
 
-            <Pressable
-              accessibilityRole="button"
-              onPress={handleContinue}
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.buttonText}>Continue</Text>
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <View style={styles.flightSummary}>
-              <View>
-                <Text style={styles.stepLabel}>FLIGHT</Text>
-                <Text style={styles.flightSummaryNumber}>{flightNumber}</Text>
-              </View>
-              <Pressable accessibilityRole="button" onPress={editFlightNumber}>
-                <Text style={styles.changeText}>Change</Text>
-              </Pressable>
-            </View>
-
-            <Text style={styles.stepLabel}>2 · DEPARTURE DATE</Text>
-
-            {Platform.OS === 'ios' ? (
-              <View style={styles.datePickerCard}>
-                <DateTimePicker
-                  accentColor={palette.accent}
-                  display="inline"
-                  mode="date"
-                  onChange={handleDateChange}
-                  themeVariant="dark"
-                  value={selectedDate}
-                />
-              </View>
-            ) : (
-              <Pressable
-                accessibilityLabel="Choose departure date"
-                accessibilityRole="button"
-                onPress={openAndroidDatePicker}
-                style={({ pressed }) => [
-                  styles.dateButton,
-                  pressed && styles.dateButtonPressed,
-                ]}
-              >
-                <Text style={styles.calendarIcon}>▦</Text>
-                <View style={styles.dateButtonText}>
-                  <Text style={styles.dateButtonLabel}>Departure date</Text>
-                  <Text style={styles.dateButtonValue}>{formatSelectedDate(selectedDate)}</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </Pressable>
-            )}
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={isLoading}
-              onPress={handleSearch}
-              style={({ pressed }) => [
-                styles.button,
-                (pressed || isLoading) && styles.buttonPressed,
-              ]}
-            >
-              {isLoading ? (
-                <ActivityIndicator color={palette.background} />
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={handleContinue}
+                    style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+                  >
+                    <Text style={styles.buttonText}>Continue</Text>
+                  </Pressable>
+                </>
               ) : (
-                <Text style={styles.buttonText}>Search {flightNumber}</Text>
+                <>
+                  <View style={styles.flightSummary}>
+                    <View>
+                      <Text style={styles.summaryLabel}>FLIGHT</Text>
+                      <Text style={styles.flightSummaryNumber}>{flightNumber}</Text>
+                    </View>
+                    <Pressable accessibilityRole="button" onPress={editFlightNumber}>
+                      <Text style={styles.changeText}>Change</Text>
+                    </Pressable>
+                  </View>
+
+                  <Text style={styles.stepLabel}>STEP 2 OF 2 · DEPARTURE DATE</Text>
+
+                  {Platform.OS === 'ios' ? (
+                    <View style={styles.datePickerCard}>
+                      <DateTimePicker
+                        accentColor={palette.accent}
+                        display="inline"
+                        mode="date"
+                        onChange={handleDateChange}
+                        themeVariant="dark"
+                        value={selectedDate}
+                      />
+                    </View>
+                  ) : (
+                    <Pressable
+                      accessibilityLabel="Choose departure date"
+                      accessibilityRole="button"
+                      onPress={openAndroidDatePicker}
+                      style={({ pressed }) => [
+                        styles.dateButton,
+                        pressed && styles.dateButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.calendarIcon}>▦</Text>
+                      <View style={styles.dateButtonText}>
+                        <Text style={styles.dateButtonLabel}>Departure date</Text>
+                        <Text style={styles.dateButtonValue}>{formatSelectedDate(selectedDate)}</Text>
+                      </View>
+                      <Text style={styles.chevron}>›</Text>
+                    </Pressable>
+                  )}
+
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isLoading}
+                    onPress={handleSearch}
+                    style={({ pressed }) => [
+                      styles.button,
+                      (pressed || isLoading) && styles.buttonPressed,
+                    ]}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color={palette.background} />
+                    ) : (
+                      <Text style={styles.buttonText}>Search {flightNumber}</Text>
+                    )}
+                  </Pressable>
+                </>
               )}
-            </Pressable>
-          </>
-        )}
-
-        <View style={styles.results}>
-          {state.kind === 'error' && (
-            <View style={styles.messageCard}>
-              <Text style={styles.messageTitle}>Couldn&apos;t search</Text>
-              <Text style={styles.messageBody}>{state.message}</Text>
-              <ManualEntryButton />
             </View>
-          )}
 
-          {state.kind === 'results' && state.flights.length === 0 && (
-            <View style={styles.messageCard}>
-              <Text style={styles.messageTitle}>No flights found</Text>
-              <Text style={styles.messageBody}>
-                We couldn&apos;t find that flight on the selected date. Double-check the number and
-                date, then try again.
-              </Text>
-              <ManualEntryButton />
+            <View style={styles.results}>
+              {state.kind === 'error' && (
+                <View style={styles.messageCard}>
+                  <Text style={styles.messageTitle}>Couldn&apos;t search</Text>
+                  <Text style={styles.messageBody}>{state.message}</Text>
+                  <ManualEntryButton />
+                </View>
+              )}
+
+              {state.kind === 'results' && state.flights.length === 0 && (
+                <View style={styles.messageCard}>
+                  <Text style={styles.messageTitle}>No flights found</Text>
+                  <Text style={styles.messageBody}>
+                    We couldn&apos;t find that flight on the selected date. Double-check the number and
+                    date, then try again.
+                  </Text>
+                  <ManualEntryButton />
+                </View>
+              )}
+
+              {state.kind === 'results' &&
+                state.flights.map(({ result, preview }) => (
+                  <FlightCard
+                    key={preview.id}
+                    flight={preview}
+                    onPress={() =>
+                      router.push(
+                        {
+                          pathname: '/confirm',
+                          params: { result: JSON.stringify(result) },
+                        } as unknown as Href,
+                      )
+                    }
+                  />
+                ))}
             </View>
-          )}
-
-          {state.kind === 'results' &&
-            state.flights.map(({ result, preview }) => (
-              <FlightCard
-                key={preview.id}
-                flight={preview}
-                onPress={() =>
-                  router.push(
-                    {
-                      pathname: '/confirm',
-                      params: { result: JSON.stringify(result) },
-                    } as unknown as Href,
-                  )
-                }
-              />
-            ))}
-
-          {state.kind === 'idle' && step === 'flight' && (
-            <Text style={styles.hint}>
-              Start with the airline code and flight number. You&apos;ll choose the date next.
-            </Text>
-          )}
-        </View>
           </>
         )}
       </ScrollView>
@@ -298,52 +300,65 @@ function ManualEntryButton() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
-  content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.md },
-  eyebrow: { color: palette.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
-  title: { color: palette.text, fontSize: 34, fontWeight: '800', marginBottom: spacing.sm },
+  content: {
+    gap: spacing.lg,
+    paddingBottom: layout.pageBottomPadding,
+    paddingHorizontal: layout.mainTabHorizontal,
+    paddingTop: layout.mainTabHeaderTop,
+  },
+  header: { gap: spacing.sm },
+  title: { color: palette.text, ...type.display },
+  subtitle: { color: palette.muted, maxWidth: 340, ...type.body },
+  searchCard: {
+    backgroundColor: palette.surface,
+    borderColor: palette.border,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    gap: spacing.md,
+    padding: spacing.md,
+  },
   stepLabel: {
     color: palette.muted,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.3,
+    ...type.eyebrow,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: palette.surface,
-    borderColor: palette.border,
+    backgroundColor: palette.background,
+    borderColor: palette.borderStrong,
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: radius.md,
     paddingHorizontal: 16,
   },
-  searchIcon: { color: palette.accent, fontSize: 22 },
-  input: { flex: 1, color: palette.text, fontSize: 16, paddingVertical: 18 },
+  searchIcon: { color: palette.accent, fontSize: 18 },
+  input: { color: palette.text, flex: 1, fontSize: 16, minHeight: layout.controlHeight },
   button: {
     backgroundColor: palette.accent,
-    borderRadius: 16,
-    paddingVertical: 17,
+    borderRadius: radius.md,
+    minHeight: layout.controlHeight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonPressed: { opacity: 0.7 },
-  buttonText: { color: palette.background, fontSize: 16, fontWeight: '800' },
+  buttonText: { color: palette.background, ...type.button },
   flightSummary: {
     alignItems: 'center',
     backgroundColor: palette.surface,
-    borderColor: palette.border,
-    borderRadius: 16,
+    borderColor: palette.borderStrong,
+    borderRadius: radius.lg,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: spacing.md,
   },
+  summaryLabel: { color: palette.muted, ...type.label },
   flightSummaryNumber: { color: palette.text, fontSize: 22, fontWeight: '800', marginTop: 4 },
   changeText: { color: palette.accent, fontSize: 14, fontWeight: '700' },
   datePickerCard: {
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 20,
+    borderRadius: radius.lg,
     borderWidth: 1,
     overflow: 'hidden',
     padding: spacing.sm,
@@ -352,7 +367,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 16,
+    borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
     padding: spacing.md,
@@ -369,18 +384,18 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderRadius: 20,
+    borderRadius: radius.lg,
     padding: spacing.lg,
   },
-  messageTitle: { color: palette.text, fontSize: 17, fontWeight: '700', marginBottom: 6 },
-  messageBody: { color: palette.muted, fontSize: 14, lineHeight: 20 },
+  messageTitle: { color: palette.text, marginBottom: 6, ...type.title },
+  messageBody: { color: palette.muted, ...type.body },
   manualButton: {
     alignItems: 'center',
     borderColor: palette.borderStrong,
-    borderRadius: 14,
+    borderRadius: radius.md,
     borderWidth: 1,
     marginTop: spacing.md,
     paddingVertical: 13,
   },
-  manualButtonText: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  manualButtonText: { color: palette.text, ...type.bodyStrong },
 });

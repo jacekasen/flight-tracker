@@ -13,7 +13,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RouteMap } from '@/components/route-map';
-import { palette, spacing } from '@/constants/theme';
+import { layout, palette, radius, spacing, type } from '@/constants/theme';
 import { flightRowToPreview, loadFlights, type FlightRow } from '@/lib/flights';
 import { summarizeFlights } from '@/lib/insights';
 import { useAuth } from '@/providers/auth-provider';
@@ -91,13 +91,12 @@ export default function FlightsScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.eyebrow}>YOUR JOURNEY</Text>
               <Text style={styles.title}>Flights</Text>
             </View>
           </View>
           <EmptyCard
             action="Sign in"
-            body="Sign in or create an account to build a private flight history across devices."
+            body="Sign in or create an account to build your flight history across devices."
             onPress={() => router.push('/profile')}
             title="Your history starts here"
           />
@@ -111,10 +110,9 @@ export default function FlightsScreen() {
       <View style={styles.mapCanvas}>
         <RouteMap fullscreen globe routes={upcomingRoutes} />
 
-        <View style={[styles.topOverlay, { paddingTop: insets.top + spacing.md }]}>
+        <View style={[styles.topOverlay, { paddingTop: insets.top + layout.mainTabHeaderTop }]}>
           <View style={styles.globeHeader}>
             <View>
-              <Text style={styles.globeEyebrow}>YOUR JOURNEY</Text>
               <Text style={styles.globeTitle}>Flights</Text>
             </View>
             <View style={styles.headerActions}>
@@ -131,17 +129,7 @@ export default function FlightsScreen() {
                   <Text style={styles.refreshIcon}>↻</Text>
                 )}
               </Pressable>
-              <View style={styles.privateBadge}>
-                <Text style={styles.privateText}>PRIVATE</Text>
-              </View>
             </View>
-          </View>
-
-          <View style={styles.globeStatus}>
-            <View style={styles.liveDot} />
-            <Text style={styles.globeStatusText}>
-              GLOBE · {upcoming.length} UPCOMING {upcoming.length === 1 ? 'FLIGHT' : 'FLIGHTS'}
-            </Text>
           </View>
 
           {message && (
@@ -293,21 +281,24 @@ function EmptyCard({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
   centeredState: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  content: { padding: spacing.lg, paddingBottom: 120, gap: spacing.md },
+  content: {
+    gap: spacing.md,
+    paddingBottom: layout.pageBottomPadding,
+    paddingHorizontal: layout.mainTabHorizontal,
+    paddingTop: layout.mainTabHeaderTop,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     marginBottom: spacing.lg,
   },
-  eyebrow: { color: palette.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
-  title: { color: palette.text, fontSize: 36, fontWeight: '800', letterSpacing: -1.5 },
+  title: { color: palette.text, ...type.display },
   mapCanvas: { backgroundColor: '#03070D', flex: 1, overflow: 'hidden' },
   topOverlay: {
-    backgroundColor: 'rgba(3, 7, 13, 0.32)',
     left: 0,
     paddingBottom: spacing.md,
-    paddingHorizontal: 20,
+    paddingHorizontal: layout.mainTabHorizontal,
     position: 'absolute',
     right: 0,
     top: 0,
@@ -317,60 +308,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  globeEyebrow: {
-    color: '#B7C6D6',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.6,
-  },
   globeTitle: {
     color: palette.text,
-    fontSize: 34,
-    fontWeight: '800',
-    letterSpacing: -1.3,
-    marginTop: 2,
+    ...type.display,
   },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 9 },
   refreshButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(18, 21, 26, 0.86)',
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 18,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 36,
     justifyContent: 'center',
     width: 36,
   },
   refreshIcon: { color: palette.text, fontSize: 21, fontWeight: '700', lineHeight: 23 },
-  privateBadge: {
-    backgroundColor: 'rgba(16, 42, 69, 0.9)',
-    borderColor: 'rgba(77, 163, 255, 0.35)',
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  privateText: { color: palette.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  globeStatus: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(18, 21, 26, 0.82)',
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 999,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 7,
-    marginTop: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  liveDot: { backgroundColor: palette.success, borderRadius: 3, height: 6, width: 6 },
-  globeStatusText: { color: '#C8D5E2', fontSize: 9, fontWeight: '800', letterSpacing: 0.9 },
   floatingError: {
     alignItems: 'center',
     backgroundColor: 'rgba(53, 24, 29, 0.94)',
     borderColor: palette.danger,
-    borderRadius: 14,
+    borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
     marginTop: spacing.sm,
@@ -427,7 +385,7 @@ const styles = StyleSheet.create({
   nextStatusBadge: {
     backgroundColor: 'rgba(16, 42, 69, 0.72)',
     borderColor: 'rgba(77, 163, 255, 0.22)',
-    borderRadius: 999,
+    borderRadius: radius.pill,
     borderWidth: 1,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -436,7 +394,7 @@ const styles = StyleSheet.create({
   noNextFlightIcon: {
     alignItems: 'center',
     backgroundColor: palette.accentSoft,
-    borderRadius: 13,
+    borderRadius: radius.md,
     height: 40,
     justifyContent: 'center',
     width: 40,
@@ -447,7 +405,7 @@ const styles = StyleSheet.create({
   flightsPanel: {
     backgroundColor: 'rgba(15, 18, 23, 0.97)',
     borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 22,
+    borderRadius: radius.xl,
     borderWidth: 1,
     bottom: Platform.OS === 'ios' ? 48 : 18,
     left: 16,
@@ -469,7 +427,7 @@ const styles = StyleSheet.create({
   panelIcon: {
     alignItems: 'center',
     backgroundColor: palette.accentSoft,
-    borderRadius: 14,
+    borderRadius: radius.md,
     height: 42,
     justifyContent: 'center',
     width: 42,
@@ -477,11 +435,11 @@ const styles = StyleSheet.create({
   panelIconText: { color: palette.accent, fontSize: 17 },
   panelCopy: { flex: 1 },
   panelTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 7 },
-  panelTitle: { color: palette.text, fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  panelTitle: { color: palette.text, ...type.title },
   totalBadge: {
     alignItems: 'center',
     backgroundColor: palette.border,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     justifyContent: 'center',
     minWidth: 20,
     paddingHorizontal: 6,
@@ -492,7 +450,7 @@ const styles = StyleSheet.create({
   expandAction: {
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.055)',
-    borderRadius: 999,
+    borderRadius: radius.pill,
     flexDirection: 'row',
     gap: 4,
     marginLeft: 10,
@@ -506,25 +464,25 @@ const styles = StyleSheet.create({
     borderColor: palette.border,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderRadius: 20,
+    borderRadius: radius.lg,
     padding: spacing.lg,
     marginTop: spacing.sm,
   },
   errorCard: {
     borderColor: palette.warning,
-    borderRadius: 20,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: spacing.lg,
   },
-  emptyTitle: { color: palette.text, fontSize: 17, fontWeight: '700', marginBottom: 6 },
-  emptyBody: { color: palette.muted, fontSize: 14, lineHeight: 20 },
+  emptyTitle: { color: palette.text, marginBottom: 6, ...type.title },
+  emptyBody: { color: palette.muted, ...type.body },
   cardButton: {
     alignItems: 'center',
     borderColor: palette.borderStrong,
-    borderRadius: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
     marginTop: spacing.md,
     paddingVertical: 12,
   },
-  cardButtonText: { color: palette.text, fontSize: 14, fontWeight: '700' },
+  cardButtonText: { color: palette.text, ...type.bodyStrong },
 });

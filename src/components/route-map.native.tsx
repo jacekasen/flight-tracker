@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
-import { palette } from '@/constants/theme';
+import { palette, radius, type } from '@/constants/theme';
 import type { InsightRoute, RoutePoint } from '@/lib/insights';
 
 const darkMapStyle = [
@@ -36,10 +36,12 @@ export function RouteMap({
   routes,
   fullscreen = false,
   globe = false,
+  hero = false,
 }: {
   routes: InsightRoute[];
   fullscreen?: boolean;
   globe?: boolean;
+  hero?: boolean;
 }) {
   const points = useMemo(
     () => routes.flatMap((route) => [route.originPoint, route.destinationPoint]),
@@ -80,9 +82,9 @@ export function RouteMap({
   };
 
   return (
-    <View style={[styles.frame, fullscreen && styles.fullscreenFrame]}>
+    <View style={[styles.frame, hero && styles.heroFrame, fullscreen && styles.fullscreenFrame]}>
       <MapView
-        accessibilityLabel={globe ? 'Globe of upcoming flight routes' : 'Map of saved flight routes'}
+        accessibilityLabel={globe ? 'Globe of saved flight routes' : 'Map of saved flight routes'}
         customMapStyle={globe ? undefined : darkMapStyle}
         initialCamera={globe ? globeCamera : undefined}
         initialRegion={globe ? undefined : region}
@@ -120,11 +122,12 @@ export function RouteMap({
 const styles = StyleSheet.create({
   frame: {
     borderColor: palette.border,
-    borderRadius: 20,
+    borderRadius: radius.lg,
     borderWidth: 1,
     height: 280,
     overflow: 'hidden',
   },
+  heroFrame: { height: 380 },
   fullscreenFrame: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 0,
@@ -152,18 +155,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: palette.surface,
     borderColor: palette.border,
-    borderRadius: 20,
+    borderRadius: radius.lg,
     borderStyle: 'dashed',
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 220,
     padding: 24,
   },
-  emptyTitle: { color: palette.text, fontSize: 16, fontWeight: '700' },
+  emptyTitle: { color: palette.text, ...type.title },
   emptyBody: {
     color: palette.muted,
-    fontSize: 13,
-    lineHeight: 19,
+    ...type.body,
     marginTop: 8,
     textAlign: 'center',
   },
