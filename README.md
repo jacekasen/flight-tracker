@@ -6,8 +6,10 @@ Phases 1–3 and the code-side Phase 4 portfolio hardening are implemented. Publ
 
 ## Current features
 
-- Timeline-style flights screen with reusable flight cards
+- Globe-first Flights screen with the next journey surfaced in a floating panel
+- Dedicated upcoming/history list with reusable flight cards
 - Two-step flight search by flight number and departure date
+- Flight-number parsing for alphanumeric airline designators such as `R3`, `F9`, and `3U`
 - Native calendar selection on iOS and Android
 - AeroDataBox flight data proxied through a Supabase Edge Function
 - Provider-independent flight result normalization
@@ -18,9 +20,10 @@ Phases 1–3 and the code-side Phase 4 portfolio hardening are implemented. Publ
 - Manual flight entry when provider lookup is unavailable
 - Row-level security for all personal flight records
 - Global airport coordinate and country metadata from OurAirports
-- Private route map with distance and flight-time totals
+- Full-screen all-time flight-path globe on web, iOS, and Android
 - Airline, airport, country, and aircraft summaries
-- All-time insights and selectable yearly recaps
+- Separate all-time/yearly Recap page with flight, distance, and time-aloft totals
+- Shared design tokens for typography, spacing, radii, controls, and main-tab alignment
 - Persistent per-user and HMAC-hashed-IP search rate limits
 - Fifteen-minute normalized provider-result caching
 - Portable private-data export and cascading account deletion
@@ -83,7 +86,7 @@ After selecting a search result, the confirmation screen:
 3. Saves through the Supabase Data API with the authenticated user's ID.
 4. Treats the database uniqueness constraint as duplicate protection.
 
-The **Flights** tab queries only records visible through RLS, separates upcoming and completed flights, and refreshes whenever it regains focus. A saved flight can be opened to edit seat or notes, edit a manually entered itinerary, or delete the record after confirmation.
+The **Flights** tab queries only records visible through RLS and opens on an immersive globe with upcoming routes and a next-flight panel. **All flights** separates upcoming and completed journeys into a chronological list and refreshes whenever it regains focus. A saved flight can be opened to edit seat or notes, edit a manually entered itinerary, or delete the record after confirmation.
 
 When lookup fails or returns no matches, **Enter flight manually** creates a record without a provider request. Manual entry validates required fields, three-letter airport codes, and arrival-after-departure ordering.
 
@@ -91,12 +94,13 @@ The signed-in **Profile** tab can export the authenticated profile and all RLS-v
 
 ## Travel insights
 
-The **Insights** tab derives every recap from the signed-in user's RLS-protected flight rows. It includes:
+The **Flight insights** entry in Profile opens an all-time, full-screen globe derived from the signed-in user's RLS-protected flight rows. Every loaded route with endpoint coordinates is drawn on the globe. A floating panel links to a dedicated **Recap** page, which includes:
 
 - All-time or year-specific flight, distance, and time-aloft totals
-- A native iOS and Android route map, with a web-safe fallback
 - Ranked airline, airport, country, and aircraft summaries
 - Partial-data handling so a missing distance, aircraft, or airport match does not remove the flight from unrelated totals
+
+The globe always represents all loaded history; selecting a year changes only the Recap metrics and rankings. Native builds use React Native Maps, while the web renderer projects every mapped route onto the app's globe visualization.
 
 Airport metadata is optional on each flight during rollout. Applying the Phase 3 migrations backfills existing rows and enriches future inserts automatically.
 
@@ -106,7 +110,7 @@ The native map works in Expo Go. Before producing a standalone Android build, co
 
 The **Add flight** tab uses this flow:
 
-1. Enter a flight number, such as `UA 120`.
+1. Enter a flight number, such as `UA 120`, `R3 501`, or `F9 1191`.
 2. Choose the departure date with the native calendar.
 3. The app invokes the `search-flights` Supabase Edge Function.
 4. The function queries [AeroDataBox](https://aerodatabox.com/) through RapidAPI.
@@ -166,9 +170,9 @@ Expo app
   │     -> confirmation
   └─> private Postgres history protected by RLS
         -> airport enrichment trigger
-        -> timeline and client-side insights
-              ├─> native route map
-              └─> totals, rankings, and yearly recaps
+        -> globe-first history and client-side insights
+              ├─> all-time web/native flight-path globe
+              └─> separate totals, rankings, and yearly Recap page
         -> JSON export and cascading account deletion
 ```
 

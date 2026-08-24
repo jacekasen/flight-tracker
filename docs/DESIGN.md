@@ -3,7 +3,7 @@
 **Author:** Jace Kasen  
 **Reviewers:** TBD  
 **Status:** Phase 4 implementation complete; release artifact pending
-**Last updated:** August 23, 2026
+**Last updated:** August 24, 2026
 **Related document:** [`PRODUCT_REQUIREMENTS.md`](PRODUCT_REQUIREMENTS.md)
 
 ## 1. Document overview
@@ -17,7 +17,7 @@ The current implementation completes search, authenticated history, travel insig
 ```text
 Expo app -> Supabase Auth -> Edge Function -> RapidAPI -> AeroDataBox
          -> Postgres with RLS -> private flight timeline
-         -> airport enrichment -> private map, summaries, and recaps
+         -> airport enrichment -> all-time globe and separate recaps
          -> private export and cascading account deletion
 Edge Function -> persistent user/IP limits -> normalized provider cache
 GitHub Actions -> app, Edge Function, and database authorization checks
@@ -78,7 +78,7 @@ flowchart TD
   cache[(Provider cache)]
   airportData[OurAirports snapshot]
   insights[Client insight aggregation]
-  map[Native route map]
+  map[Web and native route globe]
 
   mobile --> client
   client --> edge
@@ -100,7 +100,7 @@ flowchart TD
 
 Technology:
 
-- Expo SDK 57
+- Expo SDK 54
 - Expo Router
 - React Native
 - TypeScript
@@ -120,7 +120,8 @@ Responsibilities:
 - Authentication and persisted session state.
 - Search-result confirmation and duplicate-safe saving.
 - Timeline, flight details, editing, deletion, and manual entry.
-- Route maps, aggregate travel insights, and yearly recaps.
+- Globe-first Flights and Flight Insights experiences.
+- Aggregate travel insights and a separate all-time/yearly Recap page.
 - Portable JSON export and confirmed account deletion.
 
 Key locations:
@@ -134,6 +135,7 @@ Key locations:
 - `src/components/route-map.native.tsx`
 - `src/lib/flights.ts`
 - `src/lib/flight-search.ts`
+- `src/lib/flight-number.ts`
 - `src/lib/insights.ts`
 - `src/lib/account.ts`
 - `src/lib/supabase.ts`
@@ -262,12 +264,13 @@ sequenceDiagram
 ### Insights load sequence
 
 1. Restore the Supabase session and reuse the paginated, RLS-scoped `loadFlights()` query.
-2. Select all time or an origin-local departure year.
-3. Prefer a stored provider distance, then calculate a Haversine fallback from airport coordinates.
-4. Prefer a complete actual-time pair for duration; otherwise use scheduled UTC timestamps.
-5. Count every selected flight while excluding missing optional values only from the affected metric.
-6. Rank airlines, airport visits, country visits, and aircraft models in the client.
-7. Pass routes with both endpoint coordinates to the native map; use a non-blocking fallback on web.
+2. Build an all-time route set from every loaded flight with both endpoint coordinates.
+3. Render that route set on the full-screen web or native globe, independent of the selected recap year.
+4. Select all time or an origin-local departure year on the separate Recap page.
+5. Prefer a stored provider distance, then calculate a Haversine fallback from airport coordinates.
+6. Prefer a complete actual-time pair for duration; otherwise use scheduled UTC timestamps.
+7. Count every selected flight while excluding missing optional values only from the affected metric.
+8. Rank airlines, airport visits, country visits, and aircraft models in the client.
 
 ## 5. Detailed design
 
@@ -276,8 +279,10 @@ sequenceDiagram
 Accepted normalized format:
 
 ```regex
-^(?:[A-Z][A-Z0-9]|[A-Z0-9][A-Z]|[A-Z]{3})\d{1,4}[A-Z]?$
+^([A-Z0-9]{2}|[A-Z]{3})(\d{1,4}[A-Z]?)$
 ```
+
+The two-character airline designator must contain at least one letter. This preserves the boundary when the designator itself includes a digit.
 
 Examples:
 
@@ -285,6 +290,8 @@ Examples:
 - `ua120` becomes `UA120`.
 - `KL 1395` becomes `KL1395`.
 - `3u 8633` becomes `3U8633`.
+- `R3 501` becomes `R3501`.
+- `F9 1191` becomes `F91191`.
 
 Validation occurs on both the client and server:
 
@@ -475,7 +482,7 @@ The table has RLS enabled with read access for authenticated users. The generate
 
 Optional origin and destination coordinate and country fields are denormalized onto each flight. A database trigger enriches future inserts, calculates a great-circle distance when provider distance is absent, and supports a one-time backfill after the airport import. Keeping the fields optional makes the migration backward compatible and allows unknown or newly opened airports to remain valid flight records.
 
-The mobile client loads only the current user's flights through existing RLS, derives totals and rankings client-side, and filters the same rows for yearly recaps. This avoids a second user-owned aggregate surface for the portfolio scale while preserving the option to move aggregation into SQL later.
+The mobile client loads only the current user's flights through existing RLS. It derives one all-time route set for the globe, then independently filters the same rows for all-time or yearly Recap totals and rankings. This avoids a second user-owned aggregate surface for the portfolio scale while preserving the option to move aggregation into SQL later.
 
 #### Phase 4 server-only tables and account deletion
 
@@ -849,7 +856,7 @@ No alert should include flight details, notes, seats, or credentials.
 
 ## 12. Testing strategy
 
-Current automation includes 19 Vitest cases for search validation, provider normalization, duration, distance, rankings, partial records, and origin-local yearly filtering. The pgTAP suite verifies cross-user flight/profile isolation, server-only access to hardening tables and RPCs, and cascading account deletion. CI also type-checks the Deno Edge Function. Mocked provider HTTP failures, client component tests, and end-to-end device flows remain recommended follow-up coverage.
+Current automation includes 30 Vitest cases for flight-number parsing, search validation, provider normalization, duration, distance, rankings, partial records, and origin-local yearly filtering. The pgTAP suite verifies cross-user flight/profile isolation, server-only access to hardening tables and RPCs, and cascading account deletion. CI also type-checks the Deno Edge Function. Mocked provider HTTP failures, client component tests, and end-to-end device flows remain recommended follow-up coverage.
 
 ### Unit tests
 
@@ -884,8 +891,9 @@ Current automation includes 19 Vitest cases for search validation, provider norm
 - Select, confirm, and save.
 - History load and deletion.
 - Insights authentication, loading, empty, and partial-data states.
-- All-time and yearly recap selection.
-- Native route rendering and the web map fallback.
+- All-time globe rendering with every mapped route in loaded history.
+- Separate all-time and yearly Recap selection.
+- Native route rendering and projected web-globe paths.
 
 ### Required continuous checks
 
@@ -923,7 +931,7 @@ Vitest covers validation, provider normalization, time and distance calculations
 1. Import scheduled-service airport metadata from OurAirports.
 2. Backfill coordinates, countries, and missing distances while preserving provider time zones.
 3. Calculate private aggregate summaries in the client.
-4. Display native route maps and selectable yearly recaps in the Insights tab.
+4. Display web/native all-time route globes and selectable yearly metrics on a separate Recap page.
 
 ### Phase 4: Portfolio hardening — implementation complete
 

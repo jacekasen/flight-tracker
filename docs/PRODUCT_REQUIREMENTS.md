@@ -4,7 +4,7 @@
 **Document type:** Product Requirements Document (PRD)  
 **Status:** Implemented through Phase 4; release artifact pending
 **Owner:** Jace Kasen  
-**Last updated:** August 23, 2026
+**Last updated:** August 24, 2026
 
 ## 1. Product overview and impact
 
@@ -31,10 +31,10 @@ The application currently supports:
 - Normalized results rendered as flight cards.
 - Email/password authentication with persisted sessions and sign-out.
 - Search-result confirmation and duplicate-safe saving.
-- Private upcoming and completed flight history.
+- Globe-first flight history with a separate upcoming/completed journey list.
 - Flight details, editing, deletion, and manual entry.
 - Airport coordinate and country enrichment for saved routes.
-- Private route map, aggregate travel statistics, ranked summaries, and yearly recaps.
+- Full-screen all-time flight-path globe, aggregate travel statistics, ranked summaries, and a separate yearly Recap page.
 
 The application also provides portable JSON export, cascading account deletion, persistent search abuse controls, provider-result caching, and automated delivery checks.
 
@@ -178,7 +178,7 @@ Acceptance criteria:
 ### FR-2: Flight search
 
 - FR-2.1: The user must enter a flight number before choosing a date.
-- FR-2.2: The app must accept common spacing and capitalization variations such as `UA 120` and `ua120`.
+- FR-2.2: The app must accept common spacing and capitalization variations such as `UA 120` and `ua120`, plus digit-bearing airline designators such as `R3 501`, `F9 1191`, and `3U 8633`.
 - FR-2.3: The user must choose a departure date through a native calendar on iOS and Android.
 - FR-2.4: Search must only occur after explicit submission.
 - FR-2.5: Search results must include flight number, route, departure and arrival times, status, duration, and aircraft when available.
@@ -235,8 +235,8 @@ Acceptance criteria:
 
 - FR-6.1: The app must calculate total flights, distance, and flight time.
 - FR-6.2: The app must summarize airlines, airports, countries, and aircraft when data exists.
-- FR-6.3: The app must display saved routes on a map.
-- FR-6.4: The app should support a yearly recap.
+- FR-6.3: The app must display every loaded route with endpoint coordinates on an all-time globe.
+- FR-6.4: The app must provide Recap as a separate page with all-time and yearly filters.
 
 Acceptance criteria:
 
@@ -319,10 +319,11 @@ Acceptance criteria:
 
 ### Journey D: Review insights
 
-1. User opens the insights experience.
-2. App summarizes totals and top entities.
-3. User views routes on a map.
-4. User filters or selects a year for recap.
+1. User opens Flight insights from Profile.
+2. App presents a full-screen globe containing all mapped routes in loaded history.
+3. User opens Recap from the globe's summary panel.
+4. App presents flight, distance, and time-aloft totals plus ranked highlights.
+5. User selects all time or a specific year without changing the all-time globe.
 
 ## 9. Dependencies
 
@@ -447,7 +448,8 @@ Milestone: The project is safe, testable, documented, and easy for a reviewer to
 
 Phase 3 decisions:
 
-- Flight insights use a dedicated tab so map failures and heavier visualization work remain isolated from the history timeline.
+- Flight insights open from Profile into a dedicated full-screen globe so visualization work remains isolated from the history list.
+- Recap is a separate page reached from the globe; its year selector affects metrics and rankings, while the globe remains all time.
 - Airport coordinates and country information come from the public-domain OurAirports scheduled-service dataset.
 - Insights display kilometers until the profile distance-unit preference in FR-7.1 is implemented.
 
