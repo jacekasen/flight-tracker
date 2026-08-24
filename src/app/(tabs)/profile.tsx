@@ -116,6 +116,22 @@ export default function ProfileScreen() {
           <Text style={styles.eyebrow}>ACCOUNT</Text>
           <Text style={styles.title}>Profile</Text>
 
+          <Pressable
+            accessibilityHint="Opens your flight statistics and route map"
+            accessibilityRole="button"
+            onPress={() => router.push('/insights')}
+            style={({ pressed }) => [styles.insightsButton, pressed && styles.pressed]}
+          >
+            <View style={styles.insightsIcon}>
+              <Text style={styles.insightsIconText}>⌁</Text>
+            </View>
+            <View style={styles.insightsCopy}>
+              <Text style={styles.insightsTitle}>Flight insights</Text>
+              <Text style={styles.insightsBody}>View your route map, totals, and yearly recaps.</Text>
+            </View>
+            <Text style={styles.insightsArrow}>›</Text>
+          </Pressable>
+
           {!isSupabaseConfigured ? (
             <View style={styles.card}>
               <View style={styles.statusDot} />
@@ -308,7 +324,32 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.background },
   content: { padding: spacing.lg, paddingBottom: 120 },
   eyebrow: { color: palette.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
-  title: { color: palette.text, fontSize: 34, fontWeight: '800', marginBottom: spacing.xl },
+  title: { color: palette.text, fontSize: 34, fontWeight: '800', marginBottom: spacing.lg },
+  insightsButton: {
+    alignItems: 'center',
+    backgroundColor: palette.surface,
+    borderColor: palette.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: spacing.xl,
+    minHeight: 82,
+    padding: spacing.md,
+  },
+  insightsIcon: {
+    alignItems: 'center',
+    backgroundColor: palette.accentSoft,
+    borderRadius: 14,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
+  insightsIconText: { color: palette.accent, fontSize: 23, fontWeight: '800' },
+  insightsCopy: { flex: 1, gap: 3 },
+  insightsTitle: { color: palette.text, fontSize: 16, fontWeight: '800' },
+  insightsBody: { color: palette.muted, fontSize: 12, lineHeight: 17 },
+  insightsArrow: { color: palette.muted, fontSize: 28, lineHeight: 30 },
   card: {
     flexDirection: 'row',
     alignItems: 'flex-start',
