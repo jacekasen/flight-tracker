@@ -167,11 +167,15 @@ Requirements are labeled for traceability between product, design, implementatio
 - FR-1.2: The application must restore a valid session after restart.
 - FR-1.3: A user must be able to sign out.
 - FR-1.4: A user must authenticate before searching or saving so provider quota and personal history are tied to an account.
+- FR-1.5: A signed-out user must be able to request a password-reset email after entering a valid email address.
 
 Acceptance criteria:
 
 - A valid account can sign in and reach the Flights tab.
+- Signed-out users cannot open tabs or authenticated detail routes.
 - An invalid login displays an actionable error.
+- Switching between login and sign-up keeps the authentication header and mode controls anchored.
+- A valid email can request a password-reset message without submitting the login form.
 - Restarting the app preserves a valid session.
 - Signing out removes access to personal records.
 

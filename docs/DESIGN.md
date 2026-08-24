@@ -172,10 +172,11 @@ Responsibilities:
 
 - Create and authenticate users.
 - Issue and refresh sessions.
+- Send password-reset emails on an explicit user request.
 - Supply the user identity used by RLS.
 - Trigger profile creation.
 
-The Profile tab provides email/password account creation, sign-in, and sign-out. `AuthProvider` restores and observes the persisted Supabase session for the entire route tree.
+Signed-out users are routed to the dedicated `auth` screen, which provides email/password login, account creation, password visibility controls, validation, actionable errors, and password-reset email requests. `AuthProvider` restores and observes the persisted Supabase session for the entire route tree. Expo Router `Stack.Protected` guards the tabs and authenticated detail screens; after authentication, users enter the Flights tab. The Profile tab owns sign-out and account-level data controls.
 
 #### 4. Supabase Postgres
 

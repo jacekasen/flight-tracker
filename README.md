@@ -13,7 +13,8 @@ Phases 1–3 and the code-side Phase 4 portfolio hardening are implemented. Publ
 - Native calendar selection on iOS and Android
 - AeroDataBox flight data proxied through a Supabase Edge Function
 - Provider-independent flight result normalization
-- Email/password authentication with persisted sessions
+- Dedicated responsive login and sign-up screen with password recovery
+- Session-protected app routes with persisted authentication
 - Search-result confirmation with optional seat and notes
 - Private Supabase-backed history split into upcoming and completed flights
 - Flight details, personal-field editing, manual-itinerary editing, and confirmed deletion
@@ -77,7 +78,9 @@ After the import migration has been deployed, do not rewrite it. Generate a new 
 
 ## Authentication and history
 
-The **Profile** tab supports email/password account creation, sign-in, persisted sessions, and sign-out. Search and all history operations require an authenticated session.
+Signed-out users land on a dedicated responsive authentication screen with login, account creation, password visibility controls, inline validation, actionable errors, and password-reset email requests. The auth screen keeps a consistent layout across modes and expands the sign-up form downward without moving its header or mode controls.
+
+Expo Router protects the complete tab and detail route tree until `AuthProvider` restores a valid persisted Supabase session. Authenticated users enter the **Flights** tab; the **Profile** tab provides sign-out, export, and account-deletion controls. Search and all history operations require an authenticated session.
 
 After selecting a search result, the confirmation screen:
 
