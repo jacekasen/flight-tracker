@@ -102,7 +102,7 @@ function logSearch(outcome: string, startedAt: number, cache: 'hit' | 'miss' | '
   );
 }
 
-Deno.serve(async (req: Request) => {
+export async function handleSearchRequest(req: Request): Promise<Response> {
   const startedAt = Date.now();
 
   if (req.method === 'OPTIONS') {
@@ -268,4 +268,8 @@ Deno.serve(async (req: Request) => {
 
   logSearch(results.length ? 'success' : 'empty', startedAt, 'miss');
   return json(response, 200, { 'X-Cache': 'MISS' });
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleSearchRequest);
+}

@@ -1,5 +1,7 @@
 # Flight Tracker
 
+[![CI](https://github.com/jacekasen/flight-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/jacekasen/flight-tracker/actions/workflows/ci.yml)
+
 A personal flight-history app built with Expo Router, React Native, TypeScript, and Supabase. It lets me look up flights, keep a private travel history, and revisit every route on an interactive globe and in yearly recaps.
 
 [Watch the recorded walkthrough](https://youtu.be/ZIx8ffsGgGk)
@@ -8,6 +10,13 @@ A personal flight-history app built with Expo Router, React Native, TypeScript, 
   <img src="docs/images/flights-home.jpg" alt="Globe-first Flights screen showing an upcoming flight from Los Angeles to Vancouver" width="360" />
   <img src="docs/images/flight-insights.jpg" alt="Flight Insights globe showing seven mapped routes across North America" width="360" />
 </p>
+
+## Engineering highlights
+
+- Provider-independent Edge Function boundary with authenticated lookup, persistent HMAC-hashed-IP and per-user rate limits, normalized caching, and stable error responses
+- Postgres row-level security with automated cross-user authorization and cascading account-deletion assertions
+- Domain-aware handling for alphanumeric flight numbers, UTC storage, airport-local display, partial provider records, and coordinate-derived distance
+- Cross-platform route visualization with native maps on iOS and Android and a dedicated projected globe renderer on web
 
 ## Why I built it
 
@@ -41,7 +50,7 @@ The personal-use product, its code-side portfolio hardening, and the recorded wa
 - Persistent per-user and HMAC-hashed-IP search rate limits
 - Fifteen-minute normalized provider-result caching
 - Portable private-data export and cascading account deletion
-- Unit, database authorization, and continuous-integration checks
+- Unit, Edge Function HTTP, database authorization, and continuous-integration checks
 
 Project documentation:
 
@@ -238,6 +247,6 @@ npx supabase start
 npx supabase test db
 ```
 
-GitHub Actions runs the app checks, Deno Edge Function type-checking, and the database test suite for pull requests and pushes to `main`.
+GitHub Actions runs the app checks, Deno Edge Function type-checking and HTTP tests, and the database test suite for pull requests and pushes to `main`.
 
 The final hosted-demo, recording, and CI URLs belong in [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) once those external release artifacts exist.

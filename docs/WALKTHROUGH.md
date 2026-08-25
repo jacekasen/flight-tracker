@@ -33,8 +33,6 @@ Use a dedicated demo account and fictional notes. Record at a readable mobile vi
 
 ## Release evidence
 
-Before marking the portfolio release complete, replace these placeholders:
-
-- Hosted demo: `TBD`
+- Hosted demo: Not published; the recorded walkthrough is the primary no-setup evaluation artifact.
 - Recorded walkthrough: [YouTube](https://youtu.be/ZIx8ffsGgGk)
-- Passing CI run: `TBD`
+- Passing CI run: [GitHub Actions](https://github.com/jacekasen/flight-tracker/actions/runs/32901472820)

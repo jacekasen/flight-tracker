@@ -875,7 +875,7 @@ No alert should include flight details, notes, seats, or credentials.
 
 ## 12. Testing strategy
 
-Current automation includes 35 Vitest cases for flight-number parsing, search validation, provider normalization, duration, distance, rankings, partial records, origin-local yearly filtering, and shared utility behavior. The pgTAP suite verifies cross-user flight/profile isolation, server-only access to hardening tables and RPCs, and cascading account deletion. CI also type-checks the Deno Edge Function. Mocked provider HTTP failures, client component tests, and end-to-end device flows remain recommended follow-up coverage.
+Current automation includes 35 Vitest cases for flight-number parsing, search validation, provider normalization, duration, distance, rankings, partial records, origin-local yearly filtering, and shared utility behavior. Four Deno HTTP tests exercise the Edge Function's CORS, method, JSON, flight-number, and date-validation boundaries. The pgTAP suite verifies cross-user flight/profile isolation, server-only access to hardening tables and RPCs, and cascading account deletion. CI type-checks and tests the Edge Function. Mocked provider and authenticated integration paths, client component tests, and end-to-end device flows remain recommended follow-up coverage.
 
 ### Unit tests
 
@@ -893,9 +893,10 @@ Current automation includes 35 Vitest cases for flight-number parsing, search va
 
 ### Integration tests
 
-- Edge Function request and response contract.
-- Missing secret.
-- Provider 204, 400, 401, 429, 500, and malformed JSON.
+- Edge Function CORS preflight and unsupported-method responses.
+- Malformed JSON, flight-number, and date-validation responses.
+- Follow-up: missing secret and authentication failures.
+- Follow-up: provider 204, 400, 401, 429, 500, and malformed JSON.
 - Supabase insert with authenticated user.
 - Duplicate flight handling.
 - RLS cross-user isolation.
@@ -922,10 +923,11 @@ npm run typecheck
 npm run test
 npm run doctor
 deno check supabase/functions/search-flights/index.ts
+deno test supabase/functions/search-flights/index_test.ts
 npx supabase test db
 ```
 
-Vitest covers validation, provider normalization, time and distance calculations, partial data, origin-local yearly filtering, and rankings. pgTAP verifies cross-user RLS, server-only hardening surfaces, and cascading account deletion. GitHub Actions runs all application checks, Edge Function type-checking, and database tests for pull requests and pushes to `main`.
+Vitest covers validation, provider normalization, time and distance calculations, partial data, origin-local yearly filtering, and rankings. Deno tests exercise the Edge Function's unauthenticated HTTP boundary. pgTAP verifies cross-user RLS, server-only hardening surfaces, and cascading account deletion. GitHub Actions runs all application checks, Edge Function type-checking and tests, and database tests for pull requests and pushes to `main`.
 
 ## 13. Migration and rollout plan
 
