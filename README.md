@@ -4,13 +4,18 @@ A personal flight-history app built with Expo Router, React Native, TypeScript, 
 
 [Watch the recorded walkthrough](https://youtu.be/ZIx8ffsGgGk)
 
+<p align="center">
+  <img src="docs/images/flights-home.jpg" alt="Globe-first Flights screen showing an upcoming flight from Los Angeles to Vancouver" width="360" />
+  <img src="docs/images/flight-insights.jpg" alt="Flight Insights globe showing seven mapped routes across North America" width="360" />
+</p>
+
 ## Why I built it
 
 [Flighty](https://www.flighty.com/) was the primary product reference. I liked its approach to presenting flight history, but the recurring subscription prompts made it a poor fit for what I wanted: a focused flight diary for my own use. I built this independent implementation so I could own the workflow, data model, and technical decisions behind the experience.
 
 This project does not claim an original product category or feature parity with Flighty, and it is not affiliated with or endorsed by Flighty. Its portfolio value is in independently implementing and adapting the experience across Expo and Supabase: secure flight lookup, private data isolation, real-world flight-number parsing, cross-platform route visualization, and a maintainable application architecture.
 
-The personal-use product and its code-side portfolio hardening are implemented. Publishing a hosted demo or recorded walkthrough is the remaining presentation artifact.
+The personal-use product, its code-side portfolio hardening, and the recorded walkthrough are complete. A hosted demo remains an optional presentation artifact.
 
 ## Current features
 
