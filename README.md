@@ -2,6 +2,8 @@
 
 A personal flight-history app built with Expo Router, React Native, TypeScript, and Supabase. It lets me look up flights, keep a private travel history, and revisit every route on an interactive globe and in yearly recaps.
 
+[Watch the recorded walkthrough](https://youtu.be/ZIx8ffsGgGk)
+
 ## Why I built it
 
 [Flighty](https://www.flighty.com/) was the primary product reference. I liked its approach to presenting flight history, but the recurring subscription prompts made it a poor fit for what I wanted: a focused flight diary for my own use. I built this independent implementation so I could own the workflow, data model, and technical decisions behind the experience.

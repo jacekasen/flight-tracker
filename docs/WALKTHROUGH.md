@@ -36,5 +36,5 @@ Use a dedicated demo account and fictional notes. Record at a readable mobile vi
 Before marking the portfolio release complete, replace these placeholders:
 
 - Hosted demo: `TBD`
-- Recorded walkthrough: `TBD`
+- Recorded walkthrough: [YouTube](https://youtu.be/ZIx8ffsGgGk)
 - Passing CI run: `TBD`
